@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { X, Upload, GripVertical, Camera } from 'lucide-react';
+import { X, Upload, GripVertical, Camera, Loader2 } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -25,6 +25,7 @@ import {
   CAR_ACCESSIBILITY_OPTIONS,
   CarAccessibility,
 } from '@/lib/constants';
+import { compressImage } from '@/lib/imageCompression';
 import { createSpot, updateSpot } from '@/app/actions/spot';
 import { Spot } from '@/types/spot';
 
@@ -62,6 +63,7 @@ export default function SpotFormSheet({
 }: SpotFormSheetProps) {
   const isEditMode = !!editSpot;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // フォーム状態
@@ -106,13 +108,28 @@ export default function SpotFormSheet({
     }
   }, [open, initializeForm]);
 
-  // 画像ドロップゾーン
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newImages: ImageItem[] = acceptedFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setImages((prev) => [...prev, ...newImages]);
+  // 画像ドロップゾーン（圧縮処理付き）
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    setIsCompressing(true);
+    setError(null);
+    
+    try {
+      const compressedImages = await Promise.all(
+        acceptedFiles.map(async (file) => {
+          const compressedFile = await compressImage(file);
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
+          };
+        })
+      );
+      setImages((prev) => [...prev, ...compressedImages]);
+    } catch (err) {
+      console.error('Image compression error:', err);
+      setError('画像の処理に失敗しました');
+    } finally {
+      setIsCompressing(false);
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -125,15 +142,30 @@ export default function SpotFormSheet({
     noKeyboard: false,
   });
 
-  // カメラで撮影（モバイル用）
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // カメラで撮影（モバイル用・圧縮処理付き）
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const newImages: ImageItem[] = Array.from(files).map((file) => ({
-        file,
-        preview: URL.createObjectURL(file),
-      }));
-      setImages((prev) => [...prev, ...newImages]);
+      setIsCompressing(true);
+      setError(null);
+      
+      try {
+        const compressedImages = await Promise.all(
+          Array.from(files).map(async (file) => {
+            const compressedFile = await compressImage(file);
+            return {
+              file: compressedFile,
+              preview: URL.createObjectURL(compressedFile),
+            };
+          })
+        );
+        setImages((prev) => [...prev, ...compressedImages]);
+      } catch (err) {
+        console.error('Image compression error:', err);
+        setError('画像の処理に失敗しました');
+      } finally {
+        setIsCompressing(false);
+      }
     }
     // 同じファイルを再選択できるようにリセット
     e.target.value = '';
@@ -348,13 +380,28 @@ export default function SpotFormSheet({
                   capture="environment"
                   onChange={handleCameraCapture}
                   className="hidden"
+                  disabled={isCompressing}
                 />
-                <div className="flex items-center justify-center gap-2 rounded-lg border-2 border-blue-500 bg-blue-50 p-3 cursor-pointer hover:bg-blue-100 transition-colors">
-                  <Camera className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-600">カメラで撮影</span>
+                <div className={`flex items-center justify-center gap-2 rounded-lg border-2 border-blue-500 bg-blue-50 p-3 cursor-pointer hover:bg-blue-100 transition-colors ${isCompressing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {isCompressing ? (
+                    <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-blue-600" />
+                  )}
+                  <span className="text-sm font-medium text-blue-600">
+                    {isCompressing ? '処理中...' : 'カメラで撮影'}
+                  </span>
                 </div>
               </label>
             </div>
+
+            {/* 圧縮中の表示 */}
+            {isCompressing && (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>画像を最適化しています...</span>
+              </div>
+            )}
 
             {/* ファイル選択エリア */}
             <div
@@ -538,10 +585,12 @@ export default function SpotFormSheet({
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isCompressing}
             >
               {isSubmitting 
                 ? (isEditMode ? '更新中...' : '投稿中...') 
+                : isCompressing
+                ? '画像処理中...'
                 : (isEditMode ? 'このスポットを更新' : 'このスポットを登録')}
             </Button>
           </div>
