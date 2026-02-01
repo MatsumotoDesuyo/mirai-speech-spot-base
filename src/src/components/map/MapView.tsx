@@ -21,6 +21,7 @@ export default function MapView() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
   const [newSpotLocation, setNewSpotLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [viewState, setViewState] = useState({
     longitude: MAP_DEFAULTS.lng,
@@ -84,19 +85,31 @@ export default function MapView() {
     } else {
       setNewSpotLocation({ lat: viewState.latitude, lng: viewState.longitude });
     }
+    setEditingSpot(null); // 新規モード
     setIsFormOpen(true);
   };
 
   // マップ長押し（モバイル対応）
   const handleMapLongPress = useCallback((e: MapMouseEvent) => {
     setNewSpotLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    setEditingSpot(null); // 新規モード
     setIsFormOpen(true);
   }, []);
 
-  // 投稿完了後
+  // 編集ボタンクリック
+  const handleEditSpot = (spot: Spot) => {
+    setIsDetailOpen(false);
+    setSelectedSpot(null);
+    setEditingSpot(spot);
+    setNewSpotLocation(null);
+    setIsFormOpen(true);
+  };
+
+  // 投稿・編集完了後
   const handleSpotCreated = () => {
     setIsFormOpen(false);
     setNewSpotLocation(null);
+    setEditingSpot(null);
     fetchSpots();
   };
 
@@ -186,6 +199,7 @@ export default function MapView() {
         spot={selectedSpot}
         open={isDetailOpen}
         onOpenChange={handleDetailClose}
+        onEdit={handleEditSpot}
       />
 
       {/* スポット投稿フォーム */}
@@ -193,10 +207,14 @@ export default function MapView() {
         open={isFormOpen}
         onOpenChange={(open: boolean) => {
           setIsFormOpen(open);
-          if (!open) setNewSpotLocation(null);
+          if (!open) {
+            setNewSpotLocation(null);
+            setEditingSpot(null);
+          }
         }}
         initialLocation={newSpotLocation}
         onSuccess={handleSpotCreated}
+        editSpot={editingSpot}
       />
     </div>
   );

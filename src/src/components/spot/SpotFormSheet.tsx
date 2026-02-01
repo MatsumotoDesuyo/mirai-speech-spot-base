@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { X, Upload, GripVertical } from 'lucide-react';
 import {
@@ -25,13 +25,15 @@ import {
   CAR_ACCESSIBILITY_OPTIONS,
   CarAccessibility,
 } from '@/lib/constants';
-import { createSpot } from '@/app/actions/spot';
+import { createSpot, updateSpot } from '@/app/actions/spot';
+import { Spot } from '@/types/spot';
 
 interface SpotFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialLocation: { lat: number; lng: number } | null;
   onSuccess: () => void;
+  editSpot?: Spot | null; // 編集モード用
 }
 
 interface ImagePreview {
@@ -39,12 +41,26 @@ interface ImagePreview {
   preview: string;
 }
 
+// 既存画像用（編集モード）
+interface ExistingImage {
+  url: string;
+  isExisting: true;
+}
+
+type ImageItem = ImagePreview | ExistingImage;
+
+function isExistingImage(item: ImageItem): item is ExistingImage {
+  return 'isExisting' in item && item.isExisting;
+}
+
 export default function SpotFormSheet({
   open,
   onOpenChange,
   initialLocation,
   onSuccess,
+  editSpot,
 }: SpotFormSheetProps) {
+  const isEditMode = !!editSpot;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -55,12 +71,44 @@ export default function SpotFormSheet({
   const [bestTime, setBestTime] = useState<number[]>(DEFAULT_BEST_TIME);
   const [audienceAttributes, setAudienceAttributes] = useState<string[]>([]);
   const [carAccessibility, setCarAccessibility] = useState<CarAccessibility | ''>('');
-  const [images, setImages] = useState<ImagePreview[]>([]);
+  const [images, setImages] = useState<ImageItem[]>([]);
   const [passcode, setPasscode] = useState('');
+
+  // 編集モード時に初期値をセット
+  const initializeForm = useCallback(() => {
+    if (editSpot) {
+      setTitle(editSpot.title);
+      setDescription(editSpot.description || '');
+      setRating(editSpot.rating);
+      setBestTime(editSpot.best_time || DEFAULT_BEST_TIME);
+      setAudienceAttributes(editSpot.audience_attributes || []);
+      setCarAccessibility(editSpot.car_accessibility);
+      setImages(editSpot.images.map(url => ({ url, isExisting: true as const })));
+      setPasscode('');
+      setError(null);
+    } else {
+      setTitle('');
+      setDescription('');
+      setRating(DEFAULT_RATING);
+      setBestTime(DEFAULT_BEST_TIME);
+      setAudienceAttributes([]);
+      setCarAccessibility('');
+      setImages([]);
+      setPasscode('');
+      setError(null);
+    }
+  }, [editSpot]);
+
+  // シートが開いたとき、またはeditSpotが変わったときに初期化
+  useEffect(() => {
+    if (open) {
+      initializeForm();
+    }
+  }, [open, initializeForm]);
 
   // 画像ドロップゾーン
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newImages = acceptedFiles.map((file) => ({
+    const newImages: ImageItem[] = acceptedFiles.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }));
@@ -79,7 +127,10 @@ export default function SpotFormSheet({
   const handleRemoveImage = (index: number) => {
     setImages((prev) => {
       const newImages = [...prev];
-      URL.revokeObjectURL(newImages[index].preview);
+      const removed = newImages[index];
+      if (!isExistingImage(removed)) {
+        URL.revokeObjectURL(removed.preview);
+      }
       newImages.splice(index, 1);
       return newImages;
     });
@@ -118,7 +169,11 @@ export default function SpotFormSheet({
     setBestTime(DEFAULT_BEST_TIME);
     setAudienceAttributes([]);
     setCarAccessibility('');
-    images.forEach((img) => URL.revokeObjectURL(img.preview));
+    images.forEach((img) => {
+      if (!isExistingImage(img)) {
+        URL.revokeObjectURL(img.preview);
+      }
+    });
     setImages([]);
     setPasscode('');
     setError(null);
@@ -128,8 +183,13 @@ export default function SpotFormSheet({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 位置情報の取得（編集モードの場合はeditSpotから取得）
+    const location = isEditMode 
+      ? { lat: editSpot.lat, lng: editSpot.lng }
+      : initialLocation;
+
     // バリデーション（表示順に実行）
-    if (!initialLocation) {
+    if (!location) {
       setError('位置情報が取得できません');
       return;
     }
@@ -162,29 +222,59 @@ export default function SpotFormSheet({
       formData.append('title', title);
       formData.append('description', description);
       formData.append('rating', rating.toString());
-      formData.append('lat', initialLocation.lat.toString());
-      formData.append('lng', initialLocation.lng.toString());
+      formData.append('lat', location.lat.toString());
+      formData.append('lng', location.lng.toString());
       formData.append('bestTime', JSON.stringify(bestTime));
       formData.append('audienceAttributes', JSON.stringify(audienceAttributes));
       formData.append('carAccessibility', carAccessibility);
       formData.append('passcode', passcode);
       
-      images.forEach((img, index) => {
-        formData.append(`image_${index}`, img.file);
-      });
+      if (isEditMode) {
+        // 編集モード
+        formData.append('spotId', editSpot.id);
+        
+        // 既存画像のURLリスト
+        const existingImageUrls = images
+          .filter(isExistingImage)
+          .map(img => img.url);
+        formData.append('existingImages', JSON.stringify(existingImageUrls));
+        
+        // 新規画像のみ追加
+        let newImageIndex = 0;
+        images.forEach((img) => {
+          if (!isExistingImage(img)) {
+            formData.append(`image_${newImageIndex}`, img.file);
+            newImageIndex++;
+          }
+        });
 
-      const result = await createSpot(formData);
+        const result = await updateSpot(formData);
 
-      if (!result.success) {
-        setError(result.error || '投稿に失敗しました');
-        return;
+        if (!result.success) {
+          setError(result.error || '更新に失敗しました');
+          return;
+        }
+      } else {
+        // 新規作成モード
+        images.forEach((img, index) => {
+          if (!isExistingImage(img)) {
+            formData.append(`image_${index}`, img.file);
+          }
+        });
+
+        const result = await createSpot(formData);
+
+        if (!result.success) {
+          setError(result.error || '投稿に失敗しました');
+          return;
+        }
       }
 
       resetForm();
       onSuccess();
     } catch (err) {
       console.error('Submit error:', err);
-      setError('投稿中にエラーが発生しました');
+      setError(isEditMode ? '更新中にエラーが発生しました' : '投稿中にエラーが発生しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -197,13 +287,14 @@ export default function SpotFormSheet({
   return (
     <Sheet open={open} onOpenChange={(isOpen) => {
       if (!isOpen) resetForm();
+      if (isOpen && editSpot) initializeForm();
       onOpenChange(isOpen);
     }}>
       <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-xl">
         <SheetHeader className="text-left">
-          <SheetTitle>新しいスポットを登録</SheetTitle>
+          <SheetTitle>{isEditMode ? 'スポットを編集' : '新しいスポットを登録'}</SheetTitle>
           <SheetDescription>
-            演説に適した場所の情報を共有しましょう
+            {isEditMode ? '情報を更新してください' : '演説に適した場所の情報を共有しましょう'}
           </SheetDescription>
         </SheetHeader>
 
@@ -247,48 +338,57 @@ export default function SpotFormSheet({
             {/* 画像プレビュー */}
             {images.length > 0 && (
               <div className="space-y-2">
-                {images.map((img, index) => (
-                  <div
-                    key={img.preview}
-                    className="flex items-center gap-2 rounded-lg border bg-zinc-50 p-2"
-                  >
-                    <GripVertical className="h-4 w-4 text-zinc-400" />
-                    <img
-                      src={img.preview}
-                      alt={`Preview ${index + 1}`}
-                      className="h-12 w-12 rounded object-cover"
-                    />
-                    <span className="flex-1 truncate text-sm">{img.file.name}</span>
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleMoveImage(index, 'up')}
-                        disabled={index === 0}
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleMoveImage(index, 'down')}
-                        disabled={index === images.length - 1}
-                      >
-                        ↓
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveImage(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                {images.map((img, index) => {
+                  const isExisting = isExistingImage(img);
+                  const previewUrl = isExisting ? img.url : img.preview;
+                  const fileName = isExisting ? img.url.split('/').pop() || '既存画像' : img.file.name;
+                  
+                  return (
+                    <div
+                      key={previewUrl}
+                      className="flex items-center gap-2 rounded-lg border bg-zinc-50 p-2"
+                    >
+                      <GripVertical className="h-4 w-4 text-zinc-400" />
+                      <img
+                        src={previewUrl}
+                        alt={`Preview ${index + 1}`}
+                        className="h-12 w-12 rounded object-cover"
+                      />
+                      <span className="flex-1 truncate text-sm">
+                        {isExisting && <span className="text-blue-500 mr-1">[保存済]</span>}
+                        {fileName}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveImage(index, 'up')}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveImage(index, 'down')}
+                          disabled={index === images.length - 1}
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveImage(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -371,9 +471,10 @@ export default function SpotFormSheet({
           </div>
 
           {/* 位置情報 */}
-          {initialLocation && (
+          {(initialLocation || editSpot) && (
             <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
-              位置: {initialLocation.lat.toFixed(6)}, {initialLocation.lng.toFixed(6)}
+              位置: {(editSpot?.lat ?? initialLocation?.lat ?? 0).toFixed(6)}, {(editSpot?.lng ?? initialLocation?.lng ?? 0).toFixed(6)}
+              {isEditMode && <span className="ml-2 text-blue-500">(編集時は位置の変更不可)</span>}
             </div>
           )}
 
@@ -403,7 +504,9 @@ export default function SpotFormSheet({
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting ? '投稿中...' : 'このスポットを登録'}
+            {isSubmitting 
+              ? (isEditMode ? '更新中...' : '投稿中...') 
+              : (isEditMode ? 'このスポットを更新' : 'このスポットを登録')}
           </Button>
         </form>
       </SheetContent>
