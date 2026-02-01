@@ -1,0 +1,40 @@
+{
+  "syncJobs": [
+    {
+      "source": "C2V",
+      "destination": ""
+    },
+    {
+      "source": "missionOwner",
+      "destination": ""
+    },
+    {
+      "source": "gameExperienceOrchestrator",
+      "destination": ""
+    },
+    {
+      "source": "visualExperienceArchitect",
+      "destination": ""
+    },
+    {
+      "source": "novel",
+      "destination": ""
+    },
+    {
+      "source": "scenario",
+      "destination": ""
+    },
+    {
+      "source": "upstream",
+      "destination": ""
+    },
+    {
+      "source": "coder",
+      "destination": ""
+    },
+    {
+      "source": "publishing",
+      "destination": ""
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "output": {
+    "context": {
+      "missionOwner": "./tools/build-context/dist/context.missionOwner.md"
+    }
+  }
+}

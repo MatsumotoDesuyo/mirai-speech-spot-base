@@ -1,0 +1,92 @@
+{
+  "targets": {
+    "C2V": { 
+      "sources": [ 
+        "00_C2V/",
+        "90_roles/",
+        "91_standardized_procedures/C2V/"
+      ] 
+    },
+    "missionOwner":{
+      "sources": [ 
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/",
+        "91_standardized_procedures/C2V/",
+        "02_value_creation/01_game_development/"
+      ]
+    },
+    "gameExperienceOrchestrator":{
+      "sources": [ 
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/",
+        "02_value_creation/",
+        "91_standardized_procedures/C2V/",
+        "91_standardized_procedures/GEXO/"
+      ]
+    },
+    "gameExperienceOrchestrator.core":{
+      "sources": [ 
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/",
+        "02_value_creation/01_game_development/01_Constitution/",
+        "02_value_creation/01_game_development/02_visual/01_architecture/",
+        "02_value_creation/01_game_development/03_game_system/01_architecture/",
+        "02_value_creation/01_game_development/03_game_system/02_feature/",
+        "02_value_creation/01_game_development/04_sound/",
+        "91_standardized_procedures/C2V/",
+        "91_standardized_procedures/GEXO/"
+      ]
+    },
+    "visualExperienceArchitect":{
+      "sources": [ 
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/",
+        "02_value_creation/",
+        "91_standardized_procedures/C2V/"
+      ]
+    },
+    "novel":{
+      "sources": [ 
+        "91_standardized_procedures/novel/",
+        "novel/settings/",
+        "novel/cities/",
+        "novel/cases/",
+        "novel/characters/",
+        "novel/events/",
+        "novel/organizations/",
+        "novel/locations/",
+        "novel/scenarios/",
+        "novel/tips/"
+      ]
+    },
+    "scenario":{
+      "sources": [ 
+        "novel/scenarios/"
+      ]
+    },
+    "tool": { 
+      "sources": [ 
+        "system_prompt.md", 
+        "aiopm/", 
+        ".docs/" 
+      ] 
+    },
+    "coder":{
+      "sources": [ 
+        "playbooks/coder/",
+        "02_value_creation/01_game_development/03_game_system/01_architecture/",
+        "02_value_creation/01_game_development/03_game_system/02_feature/",
+        "02_value_creation/01_game_development/03_game_system/03_blueprints/",
+        "02_value_creation/01_game_development/03_game_system/09_tasks/doing/"
+      ]
+    }
+  },
+  "extensionsToProcess": [
+    ".md",
+    ".txt"
+  ]
+}

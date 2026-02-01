@@ -1,0 +1,7 @@
+{
+  "name": "sync-knowledge",
+  "version": "1.0.0",
+  "scripts": {
+    "sync": "ts-node ./src/main.ts"
+  }
+}

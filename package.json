@@ -1,0 +1,21 @@
+{
+  "name": "mirai-speech-spot-base",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "tools/*"
+  ],
+  "scripts": {
+    "deliver:context": "npm run build:context && npm run sync:knowledge",
+    "build:context": "npm run build -w build-context",
+    "build:context:tool": "npm run build:tool -w build-context",
+    "build:context:upstream": "npm run build:upstream -w build-context",
+    "build:context:product": "npm run build:product -w build-context",
+    "sync:knowledge": "npm run sync -w sync-knowledge"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

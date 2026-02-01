@@ -1,0 +1,12 @@
+{
+  "name": "build-context",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "ts-node ./src/main.ts",
+    "build:tool": "ts-node ./src/main.ts --type tool",
+    "build:upstream": "ts-node ./src/main.ts --type upstream", 
+    "build:product": "ts-node ./src/main.ts --type product",
+    "build:coder": "ts-node ./src/main.ts --type coder",
+    "instruct:gem": "ts-node ./src/main.ts"
+  }
+}

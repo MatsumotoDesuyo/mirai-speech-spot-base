@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    /* --- Build Options --- */
+    "target": "ES2022", // Modern JavaScript version
+    "module": "NodeNext", // Use the latest module system for Node.js
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist", // Output directory for compiled JavaScript
+    "esModuleInterop": true, // Allows compatibility between different module types
+    "forceConsistentCasingInFileNames": true, // Prevents case-sensitivity issues
+
+    /* --- Type Checking --- */
+    "strict": true, // Enables all strict type-checking options
+    "skipLibCheck": true, // Skip type checking of declaration files
+    
+    /* --- Project --- */
+    "resolveJsonModule": true // Allows importing .json files
+  },
+  "include": ["tools/**/*.ts"], // Tells TypeScript which files to compile
+  "exclude": ["node_modules"]
+}
