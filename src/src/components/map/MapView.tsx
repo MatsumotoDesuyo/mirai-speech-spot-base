@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/mapbox';
+import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import type { MapRef, ViewStateChangeEvent, MarkerEvent } from 'react-map-gl/mapbox';
 import type { MapMouseEvent } from 'mapbox-gl';
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin, Locate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAP_DEFAULTS, getPinColor } from '@/lib/constants';
 import { Spot } from '@/types/spot';
@@ -14,9 +14,12 @@ import SpotFormSheet from '@/components/spot/SpotFormSheet';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+const LONG_PRESS_DURATION = 500; // ミリ秒
 
 export default function MapView() {
   const mapRef = useRef<MapRef>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -70,30 +73,91 @@ export default function MapView() {
     };
   }, []);
 
+  // 現在地に移動
+  const handleGeolocate = useCallback(() => {
+    if (!navigator.geolocation) {
+      alert('お使いのブラウザでは位置情報が使用できません');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setViewState((prev) => ({
+          ...prev,
+          latitude,
+          longitude,
+          zoom: 16,
+        }));
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('位置情報の取得に失敗しました。位置情報の許可を確認してください。');
+      },
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
   // ピンクリック
   const handleMarkerClick = (spot: Spot) => {
     setSelectedSpot(spot);
     setIsDetailOpen(true);
   };
 
-  // 新規投稿ボタン
-  const handleAddClick = () => {
-    // 現在のマップ中心を取得
-    const center = mapRef.current?.getCenter();
-    if (center) {
-      setNewSpotLocation({ lat: center.lat, lng: center.lng });
-    } else {
-      setNewSpotLocation({ lat: viewState.latitude, lng: viewState.longitude });
-    }
-    setEditingSpot(null); // 新規モード
-    setIsFormOpen(true);
-  };
-
-  // マップ長押し（モバイル対応）
+  // マップ長押し（デスクトップ右クリック対応）
   const handleMapLongPress = useCallback((e: MapMouseEvent) => {
     setNewSpotLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     setEditingSpot(null); // 新規モード
     setIsFormOpen(true);
+  }, []);
+
+  // タッチ開始（モバイル長押し対応）
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return; // シングルタッチのみ
+    
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    
+    longPressTimerRef.current = setTimeout(() => {
+      // 長押し検出時、マップの座標を取得
+      const map = mapRef.current?.getMap();
+      if (map && touchStartPosRef.current) {
+        const point = map.unproject([touchStartPosRef.current.x, touchStartPosRef.current.y]);
+        setNewSpotLocation({ lat: point.lat, lng: point.lng });
+        setEditingSpot(null);
+        setIsFormOpen(true);
+        // バイブレーションフィードバック（対応デバイスのみ）
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+      }
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_DURATION);
+  }, []);
+
+  // タッチ移動（移動したら長押しキャンセル）
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || !longPressTimerRef.current) return;
+    
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartPosRef.current.x;
+    const dy = touch.clientY - touchStartPosRef.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 10px以上動いたらキャンセル
+    if (distance > 10) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  // タッチ終了
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
   }, []);
 
   // 編集ボタンクリック
@@ -120,6 +184,39 @@ export default function MapView() {
     fetchSpots();
   };
 
+  // マップのスタイル読み込み完了時に日本語ラベルを設定
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const setJapaneseLabels = () => {
+      const style = map.getStyle();
+      if (style?.layers) {
+        style.layers.forEach((layer) => {
+          if (layer.type === 'symbol' && layer.layout?.['text-field']) {
+            map.setLayoutProperty(layer.id, 'text-field', [
+              'coalesce',
+              ['get', 'name_ja'],
+              ['get', 'name'],
+            ]);
+          }
+        });
+      }
+    };
+
+    // スタイルが既に読み込まれている場合
+    if (map.isStyleLoaded()) {
+      setJapaneseLabels();
+    }
+
+    // スタイル読み込み完了時にも実行
+    map.on('style.load', setJapaneseLabels);
+
+    return () => {
+      map.off('style.load', setJapaneseLabels);
+    };
+  }, [spots]); // spotsが更新されるタイミングでmapRefが利用可能になる
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-zinc-100">
@@ -134,7 +231,13 @@ export default function MapView() {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div 
+      className="relative h-full w-full"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
       <Map
         ref={mapRef}
         {...viewState}
@@ -145,12 +248,6 @@ export default function MapView() {
         mapboxAccessToken={MAPBOX_TOKEN}
       >
         <NavigationControl position="top-right" />
-        <GeolocateControl
-          position="top-right"
-          trackUserLocation
-          showUserHeading
-          positionOptions={{ enableHighAccuracy: true }}
-        />
 
         {/* スポットマーカー */}
         {spots.map((spot) => (
@@ -179,19 +276,23 @@ export default function MapView() {
         ))}
       </Map>
 
-      {/* 新規投稿ボタン */}
+      {/* 現在地ボタン - モバイルセーフエリア対応 */}
       <Button
         size="lg"
-        className="absolute bottom-6 right-6 h-14 w-14 rounded-full shadow-lg"
-        onClick={handleAddClick}
-        title="新しいスポットを追加"
+        className="absolute right-4 h-14 w-14 rounded-full shadow-lg"
+        style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+        onClick={handleGeolocate}
+        title="現在地に移動"
       >
-        <Plus size={24} />
+        <Locate size={24} />
       </Button>
 
-      {/* ヘルプテキスト */}
-      <div className="absolute bottom-6 left-4 right-20 rounded-lg bg-white/90 px-3 py-2 text-xs text-zinc-600 shadow backdrop-blur-sm">
-        💡 右下の＋ボタンか、マップ上で右クリック（モバイルは長押し）で新規登録
+      {/* ヘルプテキスト - モバイルセーフエリア対応 */}
+      <div 
+        className="absolute left-4 right-20 rounded-lg bg-white/90 px-3 py-2 text-xs text-zinc-600 shadow backdrop-blur-sm"
+        style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+      >
+        📍 右下のボタンで現在地へ移動 ／ 長押しで新規登録
       </div>
 
       {/* スポット詳細シート */}

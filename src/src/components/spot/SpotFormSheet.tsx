@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { X, Upload, GripVertical } from 'lucide-react';
+import { X, Upload, GripVertical, Camera } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -121,7 +121,23 @@ export default function SpotFormSheet({
       'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
+    noClick: false,
+    noKeyboard: false,
   });
+
+  // カメラで撮影（モバイル用）
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newImages: ImageItem[] = Array.from(files).map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }));
+      setImages((prev) => [...prev, ...newImages]);
+    }
+    // 同じファイルを再選択できるようにリセット
+    e.target.value = '';
+  };
 
   // 画像削除
   const handleRemoveImage = (index: number) => {
@@ -322,6 +338,25 @@ export default function SpotFormSheet({
                 <li>周辺環境（人通り、道路状況など）が伝わる構図が理想</li>
               </ul>
             </div>
+            
+            {/* カメラ撮影ボタン（モバイル向け） */}
+            <div className="flex gap-2 mb-2">
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleCameraCapture}
+                  className="hidden"
+                />
+                <div className="flex items-center justify-center gap-2 rounded-lg border-2 border-blue-500 bg-blue-50 p-3 cursor-pointer hover:bg-blue-100 transition-colors">
+                  <Camera className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-600">カメラで撮影</span>
+                </div>
+              </label>
+            </div>
+
+            {/* ファイル選択エリア */}
             <div
               {...getRootProps()}
               className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
@@ -331,7 +366,7 @@ export default function SpotFormSheet({
               <input {...getInputProps()} />
               <Upload className="mx-auto mb-2 h-8 w-8 text-zinc-400" />
               <p className="text-sm text-zinc-600">
-                {isDragActive ? '画像をドロップ' : 'クリックまたはドラッグで画像を追加'}
+                {isDragActive ? '画像をドロップ' : 'ファイルから選択'}
               </p>
             </div>
 
