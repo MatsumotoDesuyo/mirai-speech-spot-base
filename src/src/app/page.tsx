@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 const MapView = dynamic(() => import('@/components/map/MapView'), {
   ssr: false,
   loading: () => (
-    <div className="flex h-screen w-full items-center justify-center bg-zinc-100">
+    <div className="flex h-screen-safe w-full items-center justify-center bg-zinc-100">
       <div className="text-lg text-zinc-500">マップを読み込み中...</div>
     </div>
   ),
@@ -14,7 +14,7 @@ const MapView = dynamic(() => import('@/components/map/MapView'), {
 
 export default function Home() {
   return (
-    <main className="relative h-screen w-full">
+    <main className="fixed inset-0 h-screen-safe w-full">
       <MapView />
     </main>
   );

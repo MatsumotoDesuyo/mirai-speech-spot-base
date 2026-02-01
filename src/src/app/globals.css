@@ -121,5 +121,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* iOSでラバーバンドが引っ張られないように */
+    overscroll-behavior: none;
+  }
+  /* セーフエリア対応の高さ */
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh; /* dynamic viewport height */
   }
 }

@@ -65,17 +65,22 @@ export async function createSpot(formData: FormData): Promise<ApiResponse<{ id: 
       const imageFile = formData.get(`image_${imageIndex}`) as File | null;
       if (!imageFile) break;
 
+      console.log(`Processing image ${imageIndex}: ${imageFile.name}, size: ${imageFile.size} bytes`);
+      
       try {
         const buffer = Buffer.from(await imageFile.arrayBuffer());
         const fileName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const url = await uploadImage(buffer, fileName, imageFile.type);
         imageUrls.push(url);
+        console.log(`Image ${imageIndex} uploaded successfully`);
       } catch (uploadErr) {
-        console.error('Image upload error:', uploadErr);
-        return { success: false, error: `画像のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
+        console.error(`Image upload error for image ${imageIndex}:`, uploadErr);
+        return { success: false, error: `画像${imageIndex + 1}のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
       }
       imageIndex++;
     }
+
+    console.log(`Total images uploaded: ${imageUrls.length}`);
 
     if (imageUrls.length === 0) {
       return { success: false, error: '写真が必要です' };
@@ -181,17 +186,22 @@ export async function updateSpot(formData: FormData): Promise<ApiResponse<{ id: 
       const imageFile = formData.get(`image_${imageIndex}`) as File | null;
       if (!imageFile) break;
 
+      console.log(`Processing new image ${imageIndex}: ${imageFile.name}, size: ${imageFile.size} bytes`);
+
       try {
         const buffer = Buffer.from(await imageFile.arrayBuffer());
         const fileName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const url = await uploadImage(buffer, fileName, imageFile.type);
         newImageUrls.push(url);
+        console.log(`New image ${imageIndex} uploaded successfully`);
       } catch (uploadErr) {
-        console.error('Image upload error:', uploadErr);
-        return { success: false, error: `画像のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
+        console.error(`Image upload error for new image ${imageIndex}:`, uploadErr);
+        return { success: false, error: `画像${imageIndex + 1}のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
       }
       imageIndex++;
     }
+
+    console.log(`Existing images: ${existingImages.length}, New images: ${newImageUrls.length}`);
 
     // 既存画像 + 新規画像
     const allImages = [...existingImages, ...newImageUrls];

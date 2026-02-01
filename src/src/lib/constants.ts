@@ -20,7 +20,8 @@ export const CAR_ACCESSIBILITY_OPTIONS = [
 
 export type CarAccessibility = typeof CAR_ACCESSIBILITY_OPTIONS[number]['value'];
 
-// 時間帯の選択肢（8:00〜22:00）
+// 時間帯の選択肢（8:00〜19:00）
+// 公職選挙法により、マイクを使った演説は8時〜20時のみ許可（20時から開始はできない）
 export const TIME_SLOTS = [
   { id: 8, label: '08:00' },
   { id: 9, label: '09:00' },
@@ -34,9 +35,6 @@ export const TIME_SLOTS = [
   { id: 17, label: '17:00' },
   { id: 18, label: '18:00' },
   { id: 19, label: '19:00' },
-  { id: 20, label: '20:00' },
-  { id: 21, label: '21:00' },
-  { id: 22, label: '22:00' },
 ] as const;
 
 // デフォルトの時間帯（未選択）

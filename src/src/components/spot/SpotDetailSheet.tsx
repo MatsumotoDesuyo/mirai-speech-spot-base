@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Clock, Users, ChevronLeft, ChevronRight, Car, Edit } from 'lucide-react';
+import { Clock, Users, ChevronLeft, ChevronRight, Car, Edit, MapPin, ExternalLink } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -57,6 +57,16 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
     if (rating >= 8) return 'bg-red-500 hover:bg-red-600';
     if (rating >= 5) return 'bg-blue-500 hover:bg-blue-600';
     return 'bg-zinc-400 hover:bg-zinc-500';
+  };
+
+  // Google Street Viewのリンクを生成
+  const getGoogleStreetViewUrl = (lat: number, lng: number): string => {
+    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+  };
+
+  // Google Mapsのリンクを生成
+  const getGoogleMapsUrl = (lat: number, lng: number): string => {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   };
 
   return (
@@ -152,6 +162,34 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
               )}
             </div>
           )}
+
+          {/* 外部リンク */}
+          <div className="flex gap-2">
+            <a
+              href={getGoogleStreetViewUrl(spot.lat, spot.lng)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button variant="outline" className="w-full text-sm">
+                <MapPin size={14} className="mr-1.5" />
+                Street View
+                <ExternalLink size={12} className="ml-1" />
+              </Button>
+            </a>
+            <a
+              href={getGoogleMapsUrl(spot.lat, spot.lng)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button variant="outline" className="w-full text-sm">
+                <MapPin size={14} className="mr-1.5" />
+                Google Maps
+                <ExternalLink size={12} className="ml-1" />
+              </Button>
+            </a>
+          </div>
 
           {/* メタ情報 */}
           <div className="border-t pt-4 text-xs text-zinc-400 space-y-1">

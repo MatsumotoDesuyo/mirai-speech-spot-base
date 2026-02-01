@@ -533,16 +533,18 @@ export default function SpotFormSheet({
             </div>
           )}
 
-          {/* 送信ボタン */}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isSubmitting}
-          >
-            {isSubmitting 
-              ? (isEditMode ? '更新中...' : '投稿中...') 
-              : (isEditMode ? 'このスポットを更新' : 'このスポットを登録')}
-          </Button>
+          {/* 送信ボタン - セーフエリア対応 */}
+          <div className="pb-[env(safe-area-inset-bottom,0px)]">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting}
+            >
+              {isSubmitting 
+                ? (isEditMode ? '更新中...' : '投稿中...') 
+                : (isEditMode ? 'このスポットを更新' : 'このスポットを登録')}
+            </Button>
+          </div>
         </form>
       </SheetContent>
     </Sheet>

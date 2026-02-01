@@ -40,7 +40,7 @@ export default function MapView() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching spots:', error);
+      console.error('Error fetching spots:', JSON.stringify(error, null, 2));
       return;
     }
 
@@ -57,7 +57,7 @@ export default function MapView() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching spots:', error);
+        console.error('Error fetching spots:', JSON.stringify(error, null, 2));
         return;
       }
 
@@ -71,6 +71,35 @@ export default function MapView() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // 初回起動時に位置情報が許可されていれば現在地に移動
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    // 位置情報の許可状態を確認
+    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'granted') {
+        // 既に許可されている場合は自動的に現在地を取得
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setViewState((prev) => ({
+              ...prev,
+              latitude,
+              longitude,
+              zoom: 16,
+            }));
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      }
+    }).catch(() => {
+      // permissions APIがサポートされていない場合は何もしない
+    });
   }, []);
 
   // 現在地に移動

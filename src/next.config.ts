@@ -13,10 +13,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: '.',
   },
-  // Server Actionsのボディサイズ制限を引き上げ（画像アップロード用）
+  // Server Actionsのボディサイズ制限を引き上げ（複数画像アップロード用）
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb',
+      bodySizeLimit: '50mb',
     },
   },
 };
