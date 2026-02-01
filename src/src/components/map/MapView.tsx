@@ -44,8 +44,30 @@ export default function MapView() {
   }, []);
 
   useEffect(() => {
-    fetchSpots();
-  }, [fetchSpots]);
+    let isMounted = true;
+    
+    const loadSpots = async () => {
+      const { data, error } = await supabase
+        .from('spots')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching spots:', error);
+        return;
+      }
+
+      if (isMounted) {
+        setSpots(data || []);
+      }
+    };
+    
+    loadSpots();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // ピンクリック
   const handleMarkerClick = (spot: Spot) => {
