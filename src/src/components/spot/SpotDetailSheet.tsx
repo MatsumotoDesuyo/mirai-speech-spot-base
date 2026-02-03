@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Clock, Users, ChevronLeft, ChevronRight, Car, Edit, MapPin, ExternalLink } from 'lucide-react';
 import {
@@ -23,19 +23,101 @@ interface SpotDetailSheetProps {
 
 export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: SpotDetailSheetProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
 
-  if (!spot) return null;
-
-  const images = spot.images || [];
+  const images = spot?.images || [];
   const hasMultipleImages = images.length > 1;
 
-  const handlePrevImage = () => {
-    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-  };
+  // Reset image index when spot changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    if (carouselRef.current) {
+      carouselRef.current.scrollLeft = 0;
+    }
+  }, [spot?.id]);
 
-  const handleNextImage = () => {
-    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-  };
+  // Preload adjacent images
+  useEffect(() => {
+    if (images.length <= 1) return;
+    
+    const preloadIndices = [
+      (currentImageIndex - 1 + images.length) % images.length,
+      (currentImageIndex + 1) % images.length,
+    ];
+    
+    preloadIndices.forEach((index) => {
+      const img = new window.Image();
+      img.src = images[index];
+    });
+  }, [currentImageIndex, images]);
+
+  const handlePrevImage = useCallback(() => {
+    const newIndex = currentImageIndex === 0 ? images.length - 1 : currentImageIndex - 1;
+    setCurrentImageIndex(newIndex);
+    if (carouselRef.current) {
+      const scrollWidth = carouselRef.current.clientWidth;
+      carouselRef.current.scrollTo({ left: newIndex * scrollWidth, behavior: 'smooth' });
+    }
+  }, [currentImageIndex, images.length]);
+
+  const handleNextImage = useCallback(() => {
+    const newIndex = currentImageIndex === images.length - 1 ? 0 : currentImageIndex + 1;
+    setCurrentImageIndex(newIndex);
+    if (carouselRef.current) {
+      const scrollWidth = carouselRef.current.clientWidth;
+      carouselRef.current.scrollTo({ left: newIndex * scrollWidth, behavior: 'smooth' });
+    }
+  }, [currentImageIndex, images.length]);
+
+  // Handle scroll events to update current index
+  const handleScroll = useCallback(() => {
+    if (!carouselRef.current || isScrolling) return;
+    
+    const scrollLeft = carouselRef.current.scrollLeft;
+    const scrollWidth = carouselRef.current.clientWidth;
+    const newIndex = Math.round(scrollLeft / scrollWidth);
+    
+    if (newIndex !== currentImageIndex && newIndex >= 0 && newIndex < images.length) {
+      setCurrentImageIndex(newIndex);
+    }
+  }, [currentImageIndex, images.length, isScrolling]);
+
+  // Snap to nearest image after scroll ends
+  const handleScrollEnd = useCallback(() => {
+    if (!carouselRef.current) return;
+    
+    const scrollLeft = carouselRef.current.scrollLeft;
+    const scrollWidth = carouselRef.current.clientWidth;
+    const newIndex = Math.round(scrollLeft / scrollWidth);
+    
+    setCurrentImageIndex(newIndex);
+    setIsScrolling(false);
+  }, []);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+
+    let scrollTimeout: NodeJS.Timeout;
+    
+    const onScroll = () => {
+      setIsScrolling(true);
+      handleScroll();
+      
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScrollEnd, 150);
+    };
+
+    carousel.addEventListener('scroll', onScroll, { passive: true });
+    
+    return () => {
+      carousel.removeEventListener('scroll', onScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [handleScroll, handleScrollEnd]);
+
+  if (!spot) return null;
 
   const getRatingLabel = (rating: number): string => {
     return RATING_DESCRIPTIONS[rating.toString()] || `Lv ${rating}`;
@@ -129,13 +211,28 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
 
           {/* 画像カルーセル */}
           {images.length > 0 && (
-            <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100">
-              <Image
-                src={images[currentImageIndex]}
-                alt={`${spot.title} - 画像 ${currentImageIndex + 1}`}
-                fill
-                className="object-cover"
-              />
+            <div className="relative w-full overflow-hidden rounded-lg bg-zinc-900">
+              {/* スクロール可能なカルーセルコンテナ */}
+              <div
+                ref={carouselRef}
+                className="flex aspect-video w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {images.map((imageUrl, index) => (
+                  <div
+                    key={imageUrl}
+                    className="relative aspect-video w-full flex-shrink-0 snap-center"
+                  >
+                    <Image
+                      src={imageUrl}
+                      alt={`${spot.title} - 画像 ${index + 1}`}
+                      fill
+                      className="object-contain"
+                      priority={index === 0 || index === currentImageIndex}
+                    />
+                  </div>
+                ))}
+              </div>
               
               {hasMultipleImages && (
                 <>
