@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import type { MapRef, ViewStateChangeEvent, MarkerEvent } from 'react-map-gl/mapbox';
-import type { MapMouseEvent } from 'mapbox-gl';
+import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
 import { MapPin, Locate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAP_DEFAULTS, getPinColor } from '@/lib/constants';
@@ -213,38 +213,66 @@ export default function MapView() {
     fetchSpots();
   };
 
-  // マップのスタイル読み込み完了時に日本語ラベルを設定
-  useEffect(() => {
-    const map = mapRef.current?.getMap();
+  // 日本語ラベルを設定する関数
+  const setJapaneseLabels = useCallback((map: MapboxMap) => {
+    const style = map.getStyle();
+    if (!style?.layers) return;
+
+    style.layers.forEach((layer) => {
+      if (layer.type === 'symbol' && layer.layout?.['text-field']) {
+        map.setLayoutProperty(layer.id, 'text-field', [
+          'coalesce',
+          ['get', 'name_ja'],
+          ['get', 'name'],
+        ]);
+      }
+    });
+  }, []);
+
+  // 日本語化が実行されたかどうかのフラグ
+  const japaneseLabelsAppliedRef = useRef(false);
+
+  // Map ref のコールバック - マップインスタンスが利用可能になったら呼ばれる
+  const handleMapRef = useCallback((ref: MapRef | null) => {
+    if (!ref) return;
+    
+    // mapRef を更新
+    (mapRef as React.MutableRefObject<MapRef | null>).current = ref;
+    
+    const map = ref.getMap();
     if (!map) return;
 
-    const setJapaneseLabels = () => {
-      const style = map.getStyle();
-      if (style?.layers) {
-        style.layers.forEach((layer) => {
-          if (layer.type === 'symbol' && layer.layout?.['text-field']) {
-            map.setLayoutProperty(layer.id, 'text-field', [
-              'coalesce',
-              ['get', 'name_ja'],
-              ['get', 'name'],
-            ]);
-          }
-        });
+    // スタイル読み込み完了時のハンドラ
+    const handleStyleLoad = () => {
+      setJapaneseLabels(map);
+      japaneseLabelsAppliedRef.current = true;
+    };
+
+    // マップ読み込み完了時のハンドラ  
+    const handleLoad = () => {
+      setJapaneseLabels(map);
+      japaneseLabelsAppliedRef.current = true;
+    };
+
+    // idleイベント（マップが完全にレンダリング完了した時）
+    const handleIdle = () => {
+      if (!japaneseLabelsAppliedRef.current) {
+        setJapaneseLabels(map);
+        japaneseLabelsAppliedRef.current = true;
       }
     };
 
-    // スタイルが既に読み込まれている場合
+    // 既にスタイルが読み込まれている場合は即座に日本語化
     if (map.isStyleLoaded()) {
-      setJapaneseLabels();
+      setJapaneseLabels(map);
+      japaneseLabelsAppliedRef.current = true;
     }
 
-    // スタイル読み込み完了時にも実行
-    map.on('style.load', setJapaneseLabels);
-
-    return () => {
-      map.off('style.load', setJapaneseLabels);
-    };
-  }, [spots]); // spotsが更新されるタイミングでmapRefが利用可能になる
+    // イベントリスナーを登録
+    map.on('load', handleLoad);
+    map.on('style.load', handleStyleLoad);
+    map.on('idle', handleIdle);
+  }, [setJapaneseLabels]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -268,7 +296,7 @@ export default function MapView() {
       onTouchCancel={handleTouchEnd}
     >
       <Map
-        ref={mapRef}
+        ref={handleMapRef}
         {...viewState}
         onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
         onContextMenu={handleMapLongPress}
