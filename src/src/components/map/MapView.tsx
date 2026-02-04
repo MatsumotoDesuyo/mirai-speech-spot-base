@@ -16,10 +16,15 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const LONG_PRESS_DURATION = 500; // ミリ秒
 
-export default function MapView() {
+interface MapViewProps {
+  initialSpotId?: string | null;
+}
+
+export default function MapView({ initialSpotId }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasInitializedLocationRef = useRef(false); // 位置情報初期化済みフラグ
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -31,6 +36,17 @@ export default function MapView() {
     latitude: MAP_DEFAULTS.lat,
     zoom: MAP_DEFAULTS.zoom,
   });
+
+  // URLのspotパラメータを更新（ページリロードなし）
+  const updateUrlSpotParam = useCallback((spotId: string | null) => {
+    const url = new URL(window.location.href);
+    if (spotId) {
+      url.searchParams.set('spot', spotId);
+    } else {
+      url.searchParams.delete('spot');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
 
   // スポット一覧を取得
   const fetchSpots = useCallback(async () => {
@@ -63,6 +79,22 @@ export default function MapView() {
 
       if (isMounted) {
         setSpots(data || []);
+        
+        // initialSpotIdがある場合、該当スポットを自動選択
+        if (initialSpotId && data) {
+          const targetSpot = data.find((s) => s.id === initialSpotId);
+          if (targetSpot) {
+            setSelectedSpot(targetSpot);
+            setIsDetailOpen(true);
+            // スポットの位置にマップを移動
+            setViewState((prev) => ({
+              ...prev,
+              latitude: targetSpot.lat,
+              longitude: targetSpot.lng,
+              zoom: 16,
+            }));
+          }
+        }
       }
     };
     
@@ -71,15 +103,30 @@ export default function MapView() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialSpotId]);
 
   // 初回起動時に位置情報が許可されていれば現在地に移動
+  // ただし、initialSpotIdが指定されている場合はスキップ（スポット位置を優先）
+  // 一度初期化したら再実行しない（スポット詳細を閉じた時の再トリガー防止）
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    // 既に初期化済みならスキップ
+    if (hasInitializedLocationRef.current) return;
+    
+    if (!navigator.geolocation) {
+      hasInitializedLocationRef.current = true;
+      return;
+    }
+    
+    // スポットURLの場合は位置情報移動をスキップし、初期化済みとマーク
+    if (initialSpotId) {
+      hasInitializedLocationRef.current = true;
+      return;
+    }
 
     // 位置情報の許可状態を確認
     navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
-      if (result.state === 'granted') {
+      if (result.state === 'granted' && !hasInitializedLocationRef.current) {
+        hasInitializedLocationRef.current = true;
         // 既に許可されている場合は自動的に現在地を取得
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -96,11 +143,14 @@ export default function MapView() {
           },
           { enableHighAccuracy: true, timeout: 5000 }
         );
+      } else {
+        hasInitializedLocationRef.current = true;
       }
     }).catch(() => {
       // permissions APIがサポートされていない場合は何もしない
+      hasInitializedLocationRef.current = true;
     });
-  }, []);
+  }, [initialSpotId]);
 
   // 現在地に移動
   const handleGeolocate = useCallback(() => {
@@ -131,6 +181,7 @@ export default function MapView() {
   const handleMarkerClick = (spot: Spot) => {
     setSelectedSpot(spot);
     setIsDetailOpen(true);
+    updateUrlSpotParam(spot.id);
   };
 
   // マップ長押し（デスクトップ右クリック対応）
@@ -210,6 +261,7 @@ export default function MapView() {
   const handleDetailClose = () => {
     setIsDetailOpen(false);
     setSelectedSpot(null);
+    updateUrlSpotParam(null);
     fetchSpots();
   };
 

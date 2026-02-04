@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Clock, Users, ChevronLeft, ChevronRight, Car, Edit, MapPin, ExternalLink } from 'lucide-react';
+import { Clock, Users, ChevronLeft, ChevronRight, Car, Edit, MapPin, ExternalLink, Share2, Check } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -25,19 +25,49 @@ interface SpotDetailSheetProps {
 export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: SpotDetailSheetProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isScrolling, setIsScrolling] = useState(false);
 
   const images = spot?.images || [];
   const hasMultipleImages = images.length > 1;
 
-  // Reset image index when spot changes
+  // Reset image index and copy state when spot changes
   useEffect(() => {
     setCurrentImageIndex(0);
+    setCopied(false);
     if (carouselRef.current) {
       carouselRef.current.scrollLeft = 0;
     }
   }, [spot?.id]);
+
+  // 共有URLを生成
+  const getShareUrl = useCallback(() => {
+    if (!spot) return '';
+    const url = new URL(window.location.origin);
+    url.searchParams.set('spot', spot.id);
+    return url.toString();
+  }, [spot]);
+
+  // URLをクリップボードにコピー
+  const handleShare = useCallback(async () => {
+    const shareUrl = getShareUrl();
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // フォールバック: 古いブラウザ対応
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [getShareUrl]);
 
   // Preload adjacent images
   useEffect(() => {
@@ -155,7 +185,7 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[70vh] overflow-y-auto rounded-t-xl">
+      <SheetContent side="bottom" className="h-[70vh] overflow-y-auto rounded-t-xl" showCloseButton={false}>
         <SheetHeader className="text-left">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-xl">{spot.title}</SheetTitle>
@@ -301,6 +331,25 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
               </Button>
             </a>
           </div>
+
+          {/* 共有ボタン */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleShare}
+          >
+            {copied ? (
+              <>
+                <Check size={16} className="mr-2 text-green-500" />
+                コピーしました！
+              </>
+            ) : (
+              <>
+                <Share2 size={16} className="mr-2" />
+                このスポットを共有
+              </>
+            )}
+          </Button>
 
           {/* メタ情報 */}
           <div className="border-t pt-4 text-xs text-zinc-400 space-y-1">
