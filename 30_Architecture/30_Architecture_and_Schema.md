@@ -91,6 +91,7 @@ src/
 ├── components/
 │   ├── map/MapView.tsx    # 地図コンポーネント
 │   ├── spot/
+│   │   ├── ImageLightbox.tsx    # 画像全画面表示（ピンチズーム対応）
 │   │   ├── SpotDetailSheet.tsx  # 詳細表示
 │   │   └── SpotFormSheet.tsx    # 投稿/編集フォーム
 │   └── ui/                # Shadcn/UI

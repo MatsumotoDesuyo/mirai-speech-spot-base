@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spot } from '@/types/spot';
 import { TIME_SLOTS, RATING_DESCRIPTIONS, CAR_ACCESSIBILITY_OPTIONS } from '@/lib/constants';
+import ImageLightbox from './ImageLightbox';
 
 interface SpotDetailSheetProps {
   spot: Spot | null;
@@ -23,6 +24,7 @@ interface SpotDetailSheetProps {
 
 export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: SpotDetailSheetProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isScrolling, setIsScrolling] = useState(false);
 
@@ -221,7 +223,11 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
                 {images.map((imageUrl, index) => (
                   <div
                     key={imageUrl}
-                    className="relative aspect-video w-full flex-shrink-0 snap-center"
+                    className="relative aspect-video w-full flex-shrink-0 snap-center cursor-pointer"
+                    onClick={() => {
+                      setCurrentImageIndex(index);
+                      setLightboxOpen(true);
+                    }}
                   >
                     <Image
                       src={imageUrl}
@@ -259,6 +265,14 @@ export default function SpotDetailSheet({ spot, open, onOpenChange, onEdit }: Sp
               )}
             </div>
           )}
+
+          {/* 画像ライトボックス */}
+          <ImageLightbox
+            images={images}
+            initialIndex={currentImageIndex}
+            open={lightboxOpen}
+            onOpenChange={setLightboxOpen}
+          />
 
           {/* 外部リンク */}
           <div className="flex gap-2">
