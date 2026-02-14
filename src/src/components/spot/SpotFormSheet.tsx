@@ -247,11 +247,6 @@ export default function SpotFormSheet({
       return;
     }
 
-    if (images.length === 0) {
-      setError('写真を1枚以上追加してください');
-      return;
-    }
-
     if (!carAccessibility) {
       setError('選挙カーの利用可否を選択してください');
       return;
@@ -347,6 +342,21 @@ export default function SpotFormSheet({
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-6">
+          {/* 入力時の注意事項 */}
+          <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4">
+            <p className="font-bold text-amber-800 mb-2">⚠️ 入力時の注意（重要）</p>
+            <p className="text-sm text-amber-700 mb-2">
+              以下の2点が明確になるよう、写真や説明文で情報を入力してください：
+            </p>
+            <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+              <li><strong>候補者がどこに立って演説できるか</strong></li>
+              <li><strong>選挙カーをどこに停めるか</strong></li>
+            </ul>
+            <p className="text-xs text-amber-600 mt-2">
+              ※ 写真がなくても登録可能ですが、上記が伝わるよう説明文を詳しく記載してください。
+            </p>
+          </div>
+
           {/* タイトル */}
           <div className="space-y-2">
             <Label htmlFor="title">場所の名前 *</Label>
@@ -361,7 +371,7 @@ export default function SpotFormSheet({
 
           {/* 写真アップロード */}
           <div className="space-y-2">
-            <Label>写真 *</Label>
+            <Label>写真（任意）</Label>
             <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700 mb-2">
               <p className="font-medium mb-1">📸 撮影のポイント</p>
               <ul className="list-disc list-inside space-y-0.5">

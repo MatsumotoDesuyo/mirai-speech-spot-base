@@ -82,10 +82,6 @@ export async function createSpot(formData: FormData): Promise<ApiResponse<{ id: 
 
     console.log(`Total images uploaded: ${imageUrls.length}`);
 
-    if (imageUrls.length === 0) {
-      return { success: false, error: '写真が必要です' };
-    }
-
     // データベースに保存
     const sortedBestTime = sortBestTime(bestTime);
     const sortedAudienceAttributes = sortAudienceAttributes(audienceAttributes);
@@ -205,10 +201,6 @@ export async function updateSpot(formData: FormData): Promise<ApiResponse<{ id: 
 
     // 既存画像 + 新規画像
     const allImages = [...existingImages, ...newImageUrls];
-
-    if (allImages.length === 0) {
-      return { success: false, error: '写真が必要です' };
-    }
 
     // データベースを更新
     const sortedBestTime = sortBestTime(bestTime);

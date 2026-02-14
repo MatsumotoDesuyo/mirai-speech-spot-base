@@ -42,7 +42,7 @@
 | `lng` | `float8` | 必須 |
 | `audience_attributes` | `text[]` | 任意。聴衆の属性タグ。保存時に定義順（主婦→学生→社会人→高齢者→ファミリー）でソート。 |
 | `car_accessibility` | `text` | 必須。選挙カー利用可否。`allowed`/`brief_stop`/`not_allowed` のいずれか。 |
-| `images` | `text[]` | 必須。画像URLの配列。配列の順序＝表示順序。最低1枚必須。 |
+| `images` | `text[]` | 任意（仮運用）。画像URLの配列。配列の順序＝表示順序。空配列も許容。 |
 | `created_at` | `timestamptz` | Default: `now()` |
 | `updated_at` | `timestamptz` | Default: `now()`、更新時自動更新 |
 
