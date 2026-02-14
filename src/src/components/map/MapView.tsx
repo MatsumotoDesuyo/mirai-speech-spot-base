@@ -31,6 +31,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
   const [newSpotLocation, setNewSpotLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [viewState, setViewState] = useState({
     longitude: MAP_DEFAULTS.lng,
     latitude: MAP_DEFAULTS.lat,
@@ -131,6 +132,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
+            setUserLocation({ lat: latitude, lng: longitude });
             setViewState((prev) => ({
               ...prev,
               latitude,
@@ -162,6 +164,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
         setViewState((prev) => ({
           ...prev,
           latitude,
@@ -383,6 +386,24 @@ export default function MapView({ initialSpotId }: MapViewProps) {
             </div>
           </Marker>
         ))}
+
+        {/* 現在地マーカー */}
+        {userLocation && (
+          <Marker
+            longitude={userLocation.lng}
+            latitude={userLocation.lat}
+            anchor="center"
+          >
+            <div className="relative flex items-center justify-center">
+              {/* 外側の波紋エフェクト */}
+              <div className="absolute h-8 w-8 animate-ping rounded-full bg-blue-400 opacity-40" />
+              {/* 精度を示す外側の円 */}
+              <div className="absolute h-6 w-6 rounded-full bg-blue-500/30" />
+              {/* 中央の青い丸 */}
+              <div className="relative h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-lg" />
+            </div>
+          </Marker>
+        )}
       </Map>
 
       {/* 現在地ボタン - モバイルセーフエリア対応 */}
