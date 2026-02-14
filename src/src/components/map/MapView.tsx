@@ -15,6 +15,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const LONG_PRESS_DURATION = 500; // ミリ秒
+const FLY_TO_DURATION = 1500; // flyToアニメーションの時間（ミリ秒）
 
 interface MapViewProps {
   initialSpotId?: string | null;
@@ -25,6 +26,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasInitializedLocationRef = useRef(false); // 位置情報初期化済みフラグ
+  const pendingFlyToRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null); // マップ読み込み後に移動する座標
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -87,13 +89,20 @@ export default function MapView({ initialSpotId }: MapViewProps) {
           if (targetSpot) {
             setSelectedSpot(targetSpot);
             setIsDetailOpen(true);
-            // スポットの位置にマップを移動
-            setViewState((prev) => ({
-              ...prev,
-              latitude: targetSpot.lat,
-              longitude: targetSpot.lng,
-              zoom: 16,
-            }));
+            // マップが読み込まれた後にアニメーションで移動するため、座標を保持
+            const flyToTarget = { lat: targetSpot.lat, lng: targetSpot.lng, zoom: 16 };
+            pendingFlyToRef.current = flyToTarget;
+            
+            // マップが既に読み込まれている場合は即座にflyTo
+            const map = mapRef.current?.getMap();
+            if (map && map.isStyleLoaded()) {
+              map.flyTo({
+                center: [flyToTarget.lng, flyToTarget.lat],
+                zoom: flyToTarget.zoom,
+                duration: FLY_TO_DURATION,
+              });
+              pendingFlyToRef.current = null;
+            }
           }
         }
       }
@@ -307,6 +316,17 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     const handleLoad = () => {
       setJapaneseLabels(map);
       japaneseLabelsAppliedRef.current = true;
+      
+      // 保留中のflyToがあれば実行
+      if (pendingFlyToRef.current) {
+        const target = pendingFlyToRef.current;
+        map.flyTo({
+          center: [target.lng, target.lat],
+          zoom: target.zoom,
+          duration: FLY_TO_DURATION,
+        });
+        pendingFlyToRef.current = null;
+      }
     };
 
     // idleイベント（マップが完全にレンダリング完了した時）
@@ -321,6 +341,17 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     if (map.isStyleLoaded()) {
       setJapaneseLabels(map);
       japaneseLabelsAppliedRef.current = true;
+      
+      // 保留中のflyToがあれば実行
+      if (pendingFlyToRef.current) {
+        const target = pendingFlyToRef.current;
+        map.flyTo({
+          center: [target.lng, target.lat],
+          zoom: target.zoom,
+          duration: FLY_TO_DURATION,
+        });
+        pendingFlyToRef.current = null;
+      }
     }
 
     // イベントリスナーを登録
