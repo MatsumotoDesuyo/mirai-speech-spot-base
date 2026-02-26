@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { X, Upload, GripVertical, Camera, Loader2 } from 'lucide-react';
 import {
@@ -35,6 +35,8 @@ interface SpotFormSheetProps {
   initialLocation: { lat: number; lng: number } | null;
   onSuccess: () => void;
   editSpot?: Spot | null; // 編集モード用
+  adjustedLocation?: { lat: number; lng: number } | null;
+  onRequestPositionAdjust?: (currentLocation: { lat: number; lng: number }) => void;
 }
 
 interface ImagePreview {
@@ -60,6 +62,8 @@ export default function SpotFormSheet({
   initialLocation,
   onSuccess,
   editSpot,
+  adjustedLocation,
+  onRequestPositionAdjust,
 }: SpotFormSheetProps) {
   const isEditMode = !!editSpot;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,6 +79,8 @@ export default function SpotFormSheet({
   const [carAccessibility, setCarAccessibility] = useState<CarAccessibility | ''>('');
   const [images, setImages] = useState<ImageItem[]>([]);
   const [passcode, setPasscode] = useState('');
+  const [locationOverride, setLocationOverride] = useState<{ lat: number; lng: number } | null>(null);
+  const isReturningFromAdjustRef = useRef(false);
 
   // 編集モード時に初期値をセット
   const initializeForm = useCallback(() => {
@@ -99,14 +105,27 @@ export default function SpotFormSheet({
       setPasscode('');
       setError(null);
     }
+    setLocationOverride(null);
   }, [editSpot]);
 
   // シートが開いたとき、またはeditSpotが変わったときに初期化
   useEffect(() => {
     if (open) {
-      initializeForm();
+      if (isReturningFromAdjustRef.current) {
+        // 位置調整モードから戻った場合はフォームをリセットしない
+        isReturningFromAdjustRef.current = false;
+      } else {
+        initializeForm();
+      }
     }
   }, [open, initializeForm]);
+
+  // 調整済み位置の反映
+  useEffect(() => {
+    if (adjustedLocation) {
+      setLocationOverride(adjustedLocation);
+    }
+  }, [adjustedLocation]);
 
   // 画像ドロップゾーン（圧縮処理付き）
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -225,16 +244,26 @@ export default function SpotFormSheet({
     setImages([]);
     setPasscode('');
     setError(null);
+    setLocationOverride(null);
+  };
+
+  // ピン位置調整を要求
+  const handleAdjustPosition = () => {
+    const currentLoc = locationOverride
+      ?? (isEditMode ? { lat: editSpot!.lat, lng: editSpot!.lng } : initialLocation);
+    if (currentLoc && onRequestPositionAdjust) {
+      isReturningFromAdjustRef.current = true;
+      onRequestPositionAdjust(currentLoc);
+    }
   };
 
   // 送信
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 位置情報の取得（編集モードの場合はeditSpotから取得）
-    const location = isEditMode 
-      ? { lat: editSpot.lat, lng: editSpot.lng }
-      : initialLocation;
+    // 位置情報の取得（調整済み位置を優先）
+    const location = locationOverride
+      ?? (isEditMode ? { lat: editSpot.lat, lng: editSpot.lng } : initialLocation);
 
     // バリデーション（表示順に実行）
     if (!location) {
@@ -565,9 +594,22 @@ export default function SpotFormSheet({
 
           {/* 位置情報 */}
           {(initialLocation || editSpot) && (
-            <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
-              位置: {(editSpot?.lat ?? initialLocation?.lat ?? 0).toFixed(6)}, {(editSpot?.lng ?? initialLocation?.lng ?? 0).toFixed(6)}
-              {isEditMode && <span className="ml-2 text-blue-500">(編集時は位置の変更不可)</span>}
+            <div className="flex items-center justify-between rounded-lg bg-zinc-50 p-3">
+              <span className="text-xs text-zinc-500">
+                📍 {(locationOverride?.lat ?? editSpot?.lat ?? initialLocation?.lat ?? 0).toFixed(6)}, {(locationOverride?.lng ?? editSpot?.lng ?? initialLocation?.lng ?? 0).toFixed(6)}
+                {locationOverride && <span className="ml-1 font-medium text-green-600">(調整済み)</span>}
+              </span>
+              {onRequestPositionAdjust && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="ml-2 h-7 shrink-0 text-xs"
+                  onClick={handleAdjustPosition}
+                >
+                  位置を調整
+                </Button>
+              )}
             </div>
           )}
 

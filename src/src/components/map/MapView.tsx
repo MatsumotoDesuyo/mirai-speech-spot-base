@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import type { MapRef, ViewStateChangeEvent, MarkerEvent } from 'react-map-gl/mapbox';
 import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
-import { MapPin, Locate } from 'lucide-react';
+import { MapPin, Locate, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAP_DEFAULTS, getPinColor } from '@/lib/constants';
 import { Spot } from '@/types/spot';
@@ -39,6 +39,17 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     latitude: MAP_DEFAULTS.lat,
     zoom: MAP_DEFAULTS.zoom,
   });
+
+  // 位置調整モード
+  const [isAdjustingPosition, setIsAdjustingPosition] = useState(false);
+  const [positionAdjustOrigin, setPositionAdjustOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  const [adjustedLocationForForm, setAdjustedLocationForForm] = useState<{ lat: number; lng: number } | null>(null);
+  const viewStateRef = useRef(viewState);
+
+  // viewStateRefを最新に保つ
+  useEffect(() => {
+    viewStateRef.current = viewState;
+  }, [viewState]);
 
   // URLのspotパラメータを更新（ページリロードなし）
   const updateUrlSpotParam = useCallback((spotId: string | null) => {
@@ -198,13 +209,16 @@ export default function MapView({ initialSpotId }: MapViewProps) {
 
   // マップ長押し（デスクトップ右クリック対応）
   const handleMapLongPress = useCallback((e: MapMouseEvent) => {
+    if (isAdjustingPosition) return;
     setNewSpotLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     setEditingSpot(null); // 新規モード
+    setAdjustedLocationForForm(null);
     setIsFormOpen(true);
-  }, []);
+  }, [isAdjustingPosition]);
 
   // タッチ開始（モバイル長押し対応）
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isAdjustingPosition) return;
     if (e.touches.length !== 1) return; // シングルタッチのみ
     
     const touch = e.touches[0];
@@ -217,6 +231,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
         const point = map.unproject([touchStartPosRef.current.x, touchStartPosRef.current.y]);
         setNewSpotLocation({ lat: point.lat, lng: point.lng });
         setEditingSpot(null);
+        setAdjustedLocationForForm(null);
         setIsFormOpen(true);
         // バイブレーションフィードバック（対応デバイスのみ）
         if (navigator.vibrate) {
@@ -225,7 +240,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
       }
       longPressTimerRef.current = null;
     }, LONG_PRESS_DURATION);
-  }, []);
+  }, [isAdjustingPosition]);
 
   // タッチ移動（移動したら長押しキャンセル）
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -258,7 +273,60 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     setSelectedSpot(null);
     setEditingSpot(spot);
     setNewSpotLocation(null);
+    setAdjustedLocationForForm(null);
     setIsFormOpen(true);
+  };
+
+  // 位置調整モード開始（SpotFormSheetからのコールバック）
+  const handleRequestPositionAdjust = useCallback((currentLocation: { lat: number; lng: number }) => {
+    setPositionAdjustOrigin(currentLocation);
+    setIsAdjustingPosition(true);
+    setIsFormOpen(false);
+
+    const map = mapRef.current?.getMap();
+    if (map) {
+      map.flyTo({
+        center: [currentLocation.lng, currentLocation.lat],
+        zoom: Math.max(viewStateRef.current.zoom, 16),
+        duration: FLY_TO_DURATION,
+      });
+    }
+  }, []);
+
+  // 位置調整確定
+  const handlePositionAdjustConfirm = () => {
+    const vs = viewStateRef.current;
+    const newLocation = { lat: vs.latitude, lng: vs.longitude };
+    setAdjustedLocationForForm(newLocation);
+    setIsAdjustingPosition(false);
+    setPositionAdjustOrigin(null);
+    setIsFormOpen(true);
+
+    const map = mapRef.current?.getMap();
+    if (map) {
+      map.flyTo({
+        center: [newLocation.lng, newLocation.lat],
+        duration: 500,
+      });
+    }
+  };
+
+  // 位置調整キャンセル
+  const handlePositionAdjustCancel = () => {
+    const origin = positionAdjustOrigin;
+    setIsAdjustingPosition(false);
+    setPositionAdjustOrigin(null);
+    setIsFormOpen(true);
+
+    if (origin) {
+      const map = mapRef.current?.getMap();
+      if (map) {
+        map.flyTo({
+          center: [origin.lng, origin.lat],
+          duration: FLY_TO_DURATION,
+        });
+      }
+    }
   };
 
   // 投稿・編集完了後
@@ -266,6 +334,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
     setIsFormOpen(false);
     setNewSpotLocation(null);
     setEditingSpot(null);
+    setAdjustedLocationForForm(null);
     fetchSpots();
   };
 
@@ -390,7 +459,7 @@ export default function MapView({ initialSpotId }: MapViewProps) {
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={MAPBOX_TOKEN}
       >
-        <NavigationControl position="top-right" />
+        {!isAdjustingPosition && <NavigationControl position="top-right" />}
 
         {/* スポットマーカー */}
         {spots.map((spot) => (
@@ -400,12 +469,13 @@ export default function MapView({ initialSpotId }: MapViewProps) {
             latitude={spot.lat}
             anchor="bottom"
             onClick={(e: MarkerEvent<Marker, MouseEvent>) => {
+              if (isAdjustingPosition) return;
               e.originalEvent.stopPropagation();
               handleMarkerClick(spot);
             }}
           >
             <div 
-              className="cursor-pointer transition-transform hover:scale-110"
+              className={`cursor-pointer transition-transform hover:scale-110 ${isAdjustingPosition ? 'opacity-30' : ''}`}
               title={spot.title}
             >
               <MapPin
@@ -437,24 +507,63 @@ export default function MapView({ initialSpotId }: MapViewProps) {
         )}
       </Map>
 
+      {/* 位置調整モード UI */}
+      {isAdjustingPosition && (
+        <>
+          {/* 中央固定ピン */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-full">
+            <MapPin size={40} fill="#ef4444" color="#fff" strokeWidth={1.5} />
+          </div>
+
+          {/* キャンセルボタン */}
+          <Button
+            variant="outline"
+            className="absolute left-4 top-4 z-20 rounded-full border bg-white/90 shadow-lg backdrop-blur-sm"
+            onClick={handlePositionAdjustCancel}
+          >
+            <X size={16} className="mr-1" /> やめる
+          </Button>
+
+          {/* 決定ボタン */}
+          <Button
+            className="absolute right-4 top-4 z-20 rounded-full shadow-lg"
+            onClick={handlePositionAdjustConfirm}
+          >
+            <Check size={16} className="mr-1" /> この位置に決定
+          </Button>
+
+          {/* 座標表示 */}
+          <div
+            className="absolute left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[10px] text-white backdrop-blur-sm"
+            style={{ bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
+          >
+            {viewState.latitude.toFixed(6)}, {viewState.longitude.toFixed(6)}
+          </div>
+        </>
+      )}
+
       {/* 現在地ボタン - モバイルセーフエリア対応 */}
-      <Button
-        size="lg"
-        className="absolute right-4 h-14 w-14 rounded-full shadow-lg"
-        style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
-        onClick={handleGeolocate}
-        title="現在地に移動"
-      >
-        <Locate size={24} />
-      </Button>
+      {!isAdjustingPosition && (
+        <Button
+          size="lg"
+          className="absolute right-4 h-14 w-14 rounded-full shadow-lg"
+          style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+          onClick={handleGeolocate}
+          title="現在地に移動"
+        >
+          <Locate size={24} />
+        </Button>
+      )}
 
       {/* ヘルプテキスト - モバイルセーフエリア対応 */}
-      <div 
-        className="absolute left-4 right-20 rounded-lg bg-white/90 px-3 py-2 text-xs text-zinc-600 shadow backdrop-blur-sm"
-        style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
-      >
-        📍 右下のボタンで現在地へ移動 ／ 長押しで新規登録
-      </div>
+      {!isAdjustingPosition && (
+        <div 
+          className="absolute left-4 right-20 rounded-lg bg-white/90 px-3 py-2 text-xs text-zinc-600 shadow backdrop-blur-sm"
+          style={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+        >
+          📍 右下のボタンで現在地へ移動 ／ 長押しで新規登録
+        </div>
+      )}
 
       {/* スポット詳細シート */}
       <SpotDetailSheet
@@ -472,11 +581,14 @@ export default function MapView({ initialSpotId }: MapViewProps) {
           if (!open) {
             setNewSpotLocation(null);
             setEditingSpot(null);
+            setAdjustedLocationForForm(null);
           }
         }}
         initialLocation={newSpotLocation}
         onSuccess={handleSpotCreated}
         editSpot={editingSpot}
+        adjustedLocation={adjustedLocationForForm}
+        onRequestPositionAdjust={handleRequestPositionAdjust}
       />
     </div>
   );
