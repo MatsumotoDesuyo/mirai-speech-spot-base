@@ -71,17 +71,20 @@
     "tool": { 
       "sources": [ 
         "system_prompt.md", 
-        "aiopm/", 
-        ".docs/" 
+        "00_C2V/",
+        "tools/docs/"
       ] 
     },
     "coder":{
       "sources": [ 
-        "playbooks/coder/",
-        "02_value_creation/01_game_development/03_game_system/01_architecture/",
-        "02_value_creation/01_game_development/03_game_system/02_feature/",
-        "02_value_creation/01_game_development/03_game_system/03_blueprints/",
-        "02_value_creation/01_game_development/03_game_system/09_tasks/doing/"
+        "91_standardized_procedures/coder/context_header.md",
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/",
+        "02_value_creation/01_game_development/01_Constitution/",
+        "02_value_creation/01_game_development/99_glossary/",
+        "02_value_creation/01_game_development/02_game_design/",
+        "02_value_creation/01_game_development/05_engineering/"
       ]
     }
   },

@@ -1,7 +1,12 @@
 {
   "output": {
     "context": {
-      "missionOwner": "./tools/build-context/dist/context.missionOwner.md"
+      "C2V": "./tools/build-context/dist/context.C2V.md",
+      "missionOwner": "./tools/build-context/dist/context.missionOwner.md",
+      "architect": "./tools/build-context/dist/context.architect.md",
+      "engineer": "./tools/build-context/dist/context.engineer.md",
+      "coder": "./tools/build-context/dist/context.coder.md",
+      "tool": "./tools/build-context/dist/context.tool.md"
     }
   }
 }

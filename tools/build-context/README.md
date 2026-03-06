@@ -1,9 +1,9 @@
 # build-context
 
-AIODフレームワーク用「コンテキスト統合ツール」
+C2Vオーケストレーション用「コンテキスト統合ツール」
 
 ## 概要
-`build-context`は、AIオーケストレーション開発（AIOD）の上流工程で作成・更新される複数のドキュメントファイルを、AIエージェントに与えるための「統合コンテキストファイル」に自動変換するコマンドラインツールです。複数のターゲット（tool、upstream、product）に対応し、それぞれ異なるコンテキストファイルを生成できます。
+`build-context`は、C2Vオーケストレーションプロジェクトで作成・更新される複数のドキュメントファイルを、AIエージェントに与えるための「統合コンテキストファイル」に自動変換するコマンドラインツールです。役割別に異なるコンテキストファイルを生成できます。
 
 ## 主な機能
 - ターゲット別のコンテキスト生成（tool、upstream、product）
@@ -45,22 +45,21 @@ npm run build:context -- --type product
 ```json
 {
   "targets": {
-    "upstream": { 
+    "missionOwner": { 
       "sources": [ 
-        "system_prompt.md", 
-        "knowledge/", 
-        "playbooks/", 
-        ".docs/" 
+        "00_C2V/",
+        "90_roles/",
+        "01_value_strategy/"
       ] 
     },
     "tool": { 
       "sources": [ 
         "system_prompt.md", 
-        "knowledge/", 
-        ".docs/" 
+        "00_C2V/",
+        "tools/docs/"
       ] 
     },
-    "product": { 
+    "coder": { 
       "sources": [] 
     }
   },
@@ -98,4 +97,4 @@ npm run build:context -- --type product
 - npm workspaces
 
 ## ライセンス
-本ツールはAIODプロジェクト内部利用を前提としています。
+本ツールはC2Vオーケストレーションプロジェクト内部利用を前提としています。
