@@ -1,0 +1,33 @@
+name: ✨ 新機能・改善の要望
+description: 新しい機能のアイデアや、既存の機能をもっと使いやすくするための提案はこちら
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        アイデアのご提案ありがとうございます！
+        このプロジェクトをより良くするための、あなたの率直な意見や「こんなことができたらいいな」をぜひ教えてください。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題や「困っていること」は何ですか？
+      description: 「なぜこの機能が欲しいのか」「現状のどこが不便なのか」を教えてください。解決策よりも、まずは課題の背景を知ることがとても重要です！
+      placeholder: 例：現状だと、ユーザー設定画面でパスワードを変更する場所が分かりにくく、迷ってしまいます。
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: どのような機能や解決策が理想ですか？
+      description: あなたが思い描く「こうなったらいいな」という理想の形を自由に書いてください。
+      placeholder: 例：トップページから1クリックでパスワード変更画面に飛べるボタンが欲しいです。
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: その他・補足情報（任意）
+      description: 参考になる他のアプリのスクリーンショットや、思いついたアイデアのメモなどがあれば、自由に書いてください。
+    validations:
+      required: false
