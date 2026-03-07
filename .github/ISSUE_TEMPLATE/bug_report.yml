@@ -1,0 +1,52 @@
+name: 🐛 バグ報告
+description: 何かが正しく動かない、エラーが出るなどの問題はこちらからご報告ください
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグのご報告ありがとうございます！問題の解決に向けて、以下のフォームにわかる範囲でご記入をお願いします。
+        **※「わからない項目」や「書くことがない項目」は空欄でも大丈夫です！**
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: どのような問題が発生しましたか？
+      description: 何をしようとした時に、どんな問題（エラーなど）が起きたのか、具体的に教えてください。
+      placeholder: 例：トップページの「ログイン」ボタンを押しても、画面が切り替わらずにエラーメッセージが表示されてしまいます。
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: 本来はどうなるべきだと思いましたか？
+      description: 問題が起きなかった場合、どういう動きになるのが正しいと思いますか？
+      placeholder: 例：ログイン画面に移動してほしいです。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce_steps
+    attributes:
+      label: 問題の再現手順（わかる場合のみ）
+      description: 私たちが同じ問題を発生させるための手順を教えてください。
+      value: |
+        1. 〇〇のページを開く
+        2. 〇〇のボタンを押す
+        3. エラーが出る
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: ご利用の環境
+      description: お使いの端末（PC、スマホ）やブラウザ（Chrome、Safariなど）を教えてください。
+      placeholder: 例：iPhone 15, Safari / Windows 11, Google Chrome
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: スクリーンショット（任意）
+      description: エラー画面などの画像があれば、ここにドラッグ＆ドロップして貼り付けてもらえると大変助かります！
+    validations:
+      required: false
