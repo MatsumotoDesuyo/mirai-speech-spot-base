@@ -1,0 +1,33 @@
+name: 🔨 設計変更・リファクタリング
+description: 内部設計の見直し、コードの品質向上、技術的負債の解消などの提案はこちら
+title: "[Refactor]: "
+labels: ["refactoring"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        アーキテクチャの変更やリファクタリングの提案ありがとうございます！
+        ユーザーの目には見えない内部的な改善や、今後の開発を楽にするための議論を行うフォーマットです。
+  - type: textarea
+    id: current_state
+    attributes:
+      label: 現状の課題・背景 (Context / Problem)
+      description: なぜこの設計変更やリファクタリングが必要なのか、現状のコードやシステムが抱えている技術的な課題を教えてください。
+      placeholder: 例：現在の認証ロジックが各画面の処理に密結合しており、今後新しいログイン方法を追加する際に修正漏れが起きやすいため。
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_architecture
+    attributes:
+      label: 提案する設計・変更内容 (Proposed Changes)
+      description: どのような設計やアプローチに変更したいか、具体的なアイデアや新しい構成のイメージを教えてください。
+      placeholder: 例：認証ロジックを専用のサービスクラスに切り出し、各画面からはそのクラスを呼び出すだけの形に変更する。
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影響範囲・懸念点 (Impact & Concerns)
+      description: この変更によって影響を受ける機能や、他の開発者が作業する際に気をつけるべき点があれば教えてください。
+    validations:
+      required: false
