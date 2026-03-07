@@ -1,0 +1,40 @@
+name: 🗺️ プロダクト戦略
+description: プロダクトの方向性、AI活用戦略、ロードマップのアップデートに関する提案や共有はこちら
+title: "[Strategy]: "
+labels: ["strategy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        プロダクトの戦略やロードマップに関する起票ありがとうございます。
+        このIssueは、機能の仕様ではなく「プロダクトがどこへ向かうべきか（Why）」を言語化し、チーム全体（およびAI）に文脈を共有するためのものです。
+  - type: textarea
+    id: background_and_why
+    attributes:
+      label: 背景と目的 (Background & Why)
+      description: なぜ今、この戦略のアップデートや方向転換が必要なのでしょうか？市場の変化、ユーザーからのフィードバック、または技術的（AI的）なブレイクスルーなど、背景となるコンテキストを詳しく教えてください。
+      placeholder: 例：最近のLLMの進化により、ユーザーが手動で設定していた項目をAIが推論できるようになったため、UIの基本思想を「設定型」から「対話型」へシフトさせる必要がある。
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_strategy
+    attributes:
+      label: 戦略の変更内容・提案 (Proposed Strategy)
+      description: 具体的にどのような戦略、ロードマップ、または開発アプローチを採用しますか？
+      placeholder: 例：Q3のロードマップを修正し、既存の設定画面の改修をストップ。代わりに自然言語によるパーソナライズ機能（docs/STRATEGY.mdに記載）のPoC開発にリソースを集中させる。
+    validations:
+      required: true
+  - type: textarea
+    id: goals_and_metrics
+    attributes:
+      label: 目指す状態と指標 (Goals & Metrics)
+      description: この戦略が成功したと言えるのは、どのような状態になった時ですか？定性的な状態や、定量的（数値）な目標があれば教えてください。
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: 関連ドキュメント (References)
+      description: 対象となるdocsフォルダ内のファイル（VISION.mdやSTRATEGY.mdなど）や、参考になる外部記事のリンクがあれば記載してください。
+    validations:
+      required: false
