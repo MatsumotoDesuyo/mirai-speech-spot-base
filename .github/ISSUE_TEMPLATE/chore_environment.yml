@@ -1,0 +1,26 @@
+name: ⚙️ 環境構築・雑務 (Chore)
+description: ライブラリのアップデート、CI/CD環境の整備、その他開発をスムーズにするためのタスクはこちら
+title: "[Chore]: "
+labels: ["chore"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        開発環境の改善やメンテナンス作業の提案ありがとうございます！
+        チーム全体の開発体験（DX）を向上させるための重要なタスクです。
+  - type: textarea
+    id: task_description
+    attributes:
+      label: タスクの概要 (Task Description)
+      description: 何を行うタスクなのか、具体的に教えてください。
+      placeholder: 例：GitHub Actionsのワークフローに、コードの自動フォーマット（Lint）チェックを追加する。
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: 実施する理由・目的 (Reason)
+      description: このタスクを行うことで、開発チームにどのようなメリットがあるか（何が楽になるか、何を防げるか）を教えてください。
+      placeholder: 例：コードレビューの際に、インデントやスペースの指摘をする手間を省き、ロジックの確認に集中できるようにするため。
+    validations:
+      required: false
