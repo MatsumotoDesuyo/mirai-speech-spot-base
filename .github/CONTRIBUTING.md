@@ -1,4 +1,4 @@
-# みらい街頭演説Base への貢献について (Contributing)
+# みらい演説スポットBase への貢献について (Contributing)
 
 本プロジェクトにご関心をお寄せいただき、誠にありがとうございます！
 私たちは、「日本の政治参入における『知的資産による障壁』を限りなくゼロに近づける」というミッションを掲げています。このOSSは、その第一歩となるプラットフォームです。
@@ -13,10 +13,10 @@
 * **[11_NorthStar.md](./01_value_strategy/11_NorthStar.md)**: プロジェクト全体が目指す究極の姿。
 * **[12_Values_and_Constraints.md](./01_value_strategy/12_Values_and_Constraints.md)**: 遵守すべき法令や行動規範（例：他陣営の妨害機能は作らない等）。
 
-### 📱 みらい街頭演説Baseのビジョン（How）
+### 📱 みらい演説スポットBaseのビジョン（How）
 上記の全体ミッションを、このアプリを通じてどのように実現するかの具体論です。
-* **[10_Mission.md](./10_speech_spot_app/01_value_strategy/10_Mission.md)**: このアプリが担う具体的な役割と価値創造の定義。
-* **[11_NorthStar.md](./10_speech_spot_app/01_value_strategy/11_NorthStar.md)**: このアプリにおいて、私たちが目指すべき究極のユーザー体験（Zero-friction Experience）。
+* **[11_Product_Mission.md](./10_speech_spot_app/01_value_strategy/11_Product_Mission.md)**: このアプリが担う具体的な役割と価値創造の定義。
+* **[12_Product_NorthStar.md](./10_speech_spot_app/01_value_strategy/12_Product_NorthStar.md)**: このアプリにおいて、私たちが目指すべき究極のユーザー体験（Zero-friction Experience）。
 
 ## 2. コミュニケーションチャネル
 * **GitHub Issues / Discussions**: 機能提案、バグ報告、技術的な議論は基本的にここで行います。なるべくGitHub上でコミュニケーションを完結させることを推奨します。
