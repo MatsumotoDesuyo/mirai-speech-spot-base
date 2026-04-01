@@ -87,6 +87,7 @@
 ### 3.4. Image Management (Multi-upload & Reorder)
 * **Camera Capture:** 「カメラで撮影」ボタンでスマートフォンのカメラを直接起動し、その場で撮影した写真をアップロード可能。
 * **File Upload:** react-dropzoneによるドラッグ&ドロップ、またはファイル選択。
+* **Supported Formats:** HEIC / HEIF / JPEG / JPG / PNG / WebP。HEIC/HEIFはクライアント側でJPEGに変換後アップロードされる。
 * **Size Limit:** 1ファイル10MBまで、Server Actions全体で10MBまで。
 * **Preview:** アップロード直後にプレビューが表示される。
 * **Reorder:** 「上へ/下へ」ボタンにより、画像の表示順序を変更できる。

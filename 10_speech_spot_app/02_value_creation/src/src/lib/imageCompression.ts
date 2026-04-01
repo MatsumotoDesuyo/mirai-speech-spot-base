@@ -9,18 +9,47 @@ const MAX_HEIGHT = 1920;
 const JPEG_QUALITY = 0.8;
 const TARGET_SIZE_KB = 1000; // 目標サイズ: 1MB以下
 
-/**
- * 画像ファイルを圧縮する
- * @param file 元の画像ファイル
- * @returns 圧縮された画像ファイル
- */
-export async function compressImage(file: File): Promise<File> {
-  // 既に小さい場合はそのまま返す
-  if (file.size <= TARGET_SIZE_KB * 1024) {
-    console.log(`Image already small enough: ${(file.size / 1024).toFixed(1)}KB`);
-    return file;
-  }
+// HEIC/HEIF判定用MIMEタイプ
+const HEIC_MIME_TYPES = ['image/heic', 'image/heif'];
+const HEIC_EXTENSIONS = ['.heic', '.heif'];
 
+/**
+ * HEIC/HEIFファイルかどうかを判定する
+ * MIMEタイプと拡張子の両方で判定（MIMEタイプが空の場合があるため）
+ */
+function isHeicFile(file: File): boolean {
+  if (HEIC_MIME_TYPES.includes(file.type.toLowerCase())) {
+    return true;
+  }
+  const ext = file.name.toLowerCase().match(/\.[^/.]+$/)?.[0] ?? '';
+  return HEIC_EXTENSIONS.includes(ext);
+}
+
+/**
+ * HEIC/HEIFファイルをheic-convertでJPEGに変換する
+ * ブラウザがネイティブでHEICをデコードできない場合のフォールバック
+ */
+async function convertHeicToJpeg(file: File): Promise<File> {
+  const mod = await import('heic-convert/browser');
+  // CJS module.exports 互換: Turbopackではdefaultに入る場合と直接入る場合がある
+  const convert = typeof mod.default === 'function' ? mod.default : (mod as unknown as typeof mod.default);
+  const inputBuffer = new Uint8Array(await file.arrayBuffer());
+  const outputBuffer = await convert({
+    buffer: inputBuffer,
+    format: 'JPEG',
+    quality: JPEG_QUALITY,
+  });
+  const baseName = file.name.replace(/\.[^/.]+$/, '');
+  return new File([outputBuffer], `${baseName}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  });
+}
+
+/**
+ * 画像をCanvasでJPEGに変換・圧縮する
+ */
+function compressViaCanvas(file: File, objectUrl: string): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const canvas = document.createElement('canvas');
@@ -34,12 +63,12 @@ export async function compressImage(file: File): Promise<File> {
     img.onload = () => {
       // アスペクト比を維持しながらリサイズ
       let { width, height } = img;
-      
+
       if (width > MAX_WIDTH) {
         height = (height * MAX_WIDTH) / width;
         width = MAX_WIDTH;
       }
-      
+
       if (height > MAX_HEIGHT) {
         width = (width * MAX_HEIGHT) / height;
         height = MAX_HEIGHT;
@@ -59,7 +88,6 @@ export async function compressImage(file: File): Promise<File> {
             return;
           }
 
-          // ファイル名を生成（元のファイル名を維持しつつ拡張子をjpgに）
           const baseName = file.name.replace(/\.[^/.]+$/, '');
           const newFile = new File([blob], `${baseName}.jpg`, {
             type: 'image/jpeg',
@@ -79,19 +107,63 @@ export async function compressImage(file: File): Promise<File> {
     };
 
     img.onerror = () => {
-      reject(new Error('Failed to load image'));
+      reject(new Error('NATIVE_DECODE_FAILED'));
     };
 
-    // FileをDataURLに変換して読み込み
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
   });
+}
+
+/**
+ * 画像ファイルを圧縮する
+ * HEIC/HEIFの場合:
+ *   1. まずブラウザのネイティブデコードを試行（Safari等）
+ *   2. 失敗したらheic-convertでソフトウェアデコード（Chrome等）
+ * @param file 元の画像ファイル
+ * @returns 圧縮された画像ファイル
+ */
+export async function compressImage(file: File): Promise<File> {
+  const needsConversion = isHeicFile(file);
+
+  // HEIC/HEIFでなく、かつ既に小さい場合はそのまま返す
+  if (!needsConversion && file.size <= TARGET_SIZE_KB * 1024) {
+    console.log(`Image already small enough: ${(file.size / 1024).toFixed(1)}KB`);
+    return file;
+  }
+
+  if (needsConversion) {
+    console.log(`Converting HEIC/HEIF to JPEG: ${file.name}`);
+  }
+
+  // まずブラウザのネイティブデコードを試行
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    return await compressViaCanvas(file, objectUrl);
+  } catch (e) {
+    // HEIC/HEIFでネイティブデコード失敗時のみフォールバック
+    if (!needsConversion || (e instanceof Error && e.message !== 'NATIVE_DECODE_FAILED')) {
+      throw e;
+    }
+    console.log('Native HEIC decode failed, falling back to heic-convert');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  // フォールバック: heic-convertでソフトウェアデコード → Canvas圧縮
+  const convertedFile = await convertHeicToJpeg(file);
+
+  // 変換後のサイズが十分小さければそのまま返す
+  if (convertedFile.size <= TARGET_SIZE_KB * 1024) {
+    return convertedFile;
+  }
+
+  // 変換後のファイルをCanvas圧縮パイプラインに通す
+  const convertedUrl = URL.createObjectURL(convertedFile);
+  try {
+    return await compressViaCanvas(convertedFile, convertedUrl);
+  } finally {
+    URL.revokeObjectURL(convertedUrl);
+  }
 }
 
 /**

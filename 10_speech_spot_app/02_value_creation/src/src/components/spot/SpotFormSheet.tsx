@@ -144,8 +144,9 @@ export default function SpotFormSheet({
       );
       setImages((prev) => [...prev, ...compressedImages]);
     } catch (err) {
-      console.error('Image compression error:', err);
-      setError('画像の処理に失敗しました');
+      const message = err instanceof Error ? err.message : '画像の処理に失敗しました';
+      console.error('Image compression error:', message);
+      setError(message);
     } finally {
       setIsCompressing(false);
     }
@@ -154,7 +155,11 @@ export default function SpotFormSheet({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
+      'image/jpeg': ['.jpeg', '.jpg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'image/heic': ['.heic'],
+      'image/heif': ['.heif'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
     noClick: false,
