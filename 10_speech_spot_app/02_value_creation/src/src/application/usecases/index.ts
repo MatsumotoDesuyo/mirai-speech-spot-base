@@ -1,4 +1,4 @@
-export { CreateSpotUseCase, AuthenticationError, ImageUploadError } from './CreateSpotUseCase';
+export { CreateSpotUseCase, AuthenticationError, ImageLimitError } from './CreateSpotUseCase';
 export type { CreateSpotCommand } from './CreateSpotUseCase';
 export { UpdateSpotUseCase } from './UpdateSpotUseCase';
 export type { UpdateSpotCommand } from './UpdateSpotUseCase';

@@ -19,14 +19,8 @@ import {
 } from '../../helpers/formDataHelper';
 
 // --- Mocks ---
-const mockUploadImage = vi.fn();
-
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => getMockCreateClient()(),
-}));
-
-vi.mock('@/lib/r2/client', () => ({
-  uploadImage: (...args: unknown[]) => mockUploadImage(...args),
 }));
 
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co');
@@ -86,21 +80,18 @@ describe('CreateSpot', () => {
       expect(insertCall.audience_attributes).toEqual(['主婦', '学生', 'ファミリー']);
     });
 
-    it('UC-CS-02: 画像付きでSpotが作成される', async () => {
-      mockUploadImage.mockResolvedValue('https://r2.example.com/spots/image.jpg');
+    it('UC-CS-02: 画像URL付きでSpotが作成される', async () => {
       mockSupabaseResponse({ data: { id: 'new-spot-id' } });
 
-      const imageFile = new File(['image-data'], 'photo.jpg', { type: 'image/jpeg' });
       const formData = buildSpotFormData({
         ...VALID_SPOT_DATA,
-        images: [imageFile],
+        imageUrls: ['https://r2.example.com/spots/image1.jpg', 'https://r2.example.com/spots/image2.jpg'],
       });
       const result = await createSpot(formData);
 
       expect(result.success).toBe(true);
-      expect(mockUploadImage).toHaveBeenCalledOnce();
       const insertCall = queryBuilder.insert.mock.calls[0]?.[0];
-      expect(insertCall.images).toEqual(['https://r2.example.com/spots/image.jpg']);
+      expect(insertCall.images).toEqual(['https://r2.example.com/spots/image1.jpg', 'https://r2.example.com/spots/image2.jpg']);
     });
 
     it('UC-CS-03: 任意項目なしでSpotが作成される', async () => {
@@ -183,18 +174,16 @@ describe('CreateSpot', () => {
       expect(queryBuilder.insert).not.toHaveBeenCalled();
     });
 
-    it('画像アップロードが失敗した場合はエラーが返される', async () => {
-      mockUploadImage.mockRejectedValue(new Error('R2 upload failed'));
-
-      const imageFile = new File(['image-data'], 'photo.jpg', { type: 'image/jpeg' });
+    it('R-SV-07: 画像が10枚を超える場合は拒否される', async () => {
+      const imageUrls = Array.from({ length: 11 }, (_, i) => `https://r2.example.com/spots/image${i}.jpg`);
       const formData = buildSpotFormData({
         ...VALID_SPOT_DATA,
-        images: [imageFile],
+        imageUrls,
       });
       const result = await createSpot(formData);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('画像');
+      expect(result.error).toContain('10');
       expect(queryBuilder.insert).not.toHaveBeenCalled();
     });
 

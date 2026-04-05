@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -55,4 +56,24 @@ export async function uploadImage(
     console.error('R2 upload failed:', error);
     throw error;
   }
+}
+
+// Presigned URL生成（クライアントからの直接アップロード用）
+export async function generatePresignedUploadUrl(
+  fileName: string,
+  contentType: string,
+): Promise<{ uploadUrl: string; publicUrl: string; key: string }> {
+  const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const key = `spots/${Date.now()}-${sanitizedName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 600 });
+  const publicUrl = getPublicUrl(key);
+
+  return { uploadUrl, publicUrl, key };
 }

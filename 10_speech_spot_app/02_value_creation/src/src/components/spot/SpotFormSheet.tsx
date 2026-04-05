@@ -26,7 +26,7 @@ import {
   CarAccessibility,
 } from '@/lib/constants';
 import { compressImage } from '@/lib/imageCompression';
-import { createSpot, updateSpot } from '@/app/actions/spot';
+import { createSpot, updateSpot, getUploadUrls } from '@/app/actions/spot';
 import { Spot } from '@/types/spot';
 
 interface SpotFormSheetProps {
@@ -295,6 +295,40 @@ export default function SpotFormSheet({
     setError(null);
 
     try {
+      // 新規画像をR2にPresigned URL方式で直接アップロード
+      const newImages = images.filter((img): img is ImagePreview => !isExistingImage(img));
+      let newImageUrls: string[] = [];
+
+      if (newImages.length > 0) {
+        const uploadUrlsResult = await getUploadUrls(
+          passcode,
+          newImages.map((img) => ({ fileName: img.file.name, mimeType: img.file.type })),
+        );
+
+        if (!uploadUrlsResult.success || !uploadUrlsResult.data) {
+          setError(uploadUrlsResult.error || '画像アップロードURLの取得に失敗しました');
+          return;
+        }
+
+        // 各画像をR2に直接PUT
+        const uploadResults = await Promise.all(
+          uploadUrlsResult.data.map(async ({ uploadUrl, publicUrl }, index) => {
+            const file = newImages[index].file;
+            const response = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: { 'Content-Type': file.type },
+            });
+            if (!response.ok) {
+              throw new Error(`画像${index + 1}のアップロードに失敗しました`);
+            }
+            return publicUrl;
+          }),
+        );
+
+        newImageUrls = uploadResults;
+      }
+
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
@@ -315,15 +349,7 @@ export default function SpotFormSheet({
           .filter(isExistingImage)
           .map(img => img.url);
         formData.append('existingImages', JSON.stringify(existingImageUrls));
-        
-        // 新規画像のみ追加
-        let newImageIndex = 0;
-        images.forEach((img) => {
-          if (!isExistingImage(img)) {
-            formData.append(`image_${newImageIndex}`, img.file);
-            newImageIndex++;
-          }
-        });
+        formData.append('imageUrls', JSON.stringify(newImageUrls));
 
         const result = await updateSpot(formData);
 
@@ -333,11 +359,7 @@ export default function SpotFormSheet({
         }
       } else {
         // 新規作成モード
-        images.forEach((img, index) => {
-          if (!isExistingImage(img)) {
-            formData.append(`image_${index}`, img.file);
-          }
-        });
+        formData.append('imageUrls', JSON.stringify(newImageUrls));
 
         const result = await createSpot(formData);
 

@@ -17,7 +17,7 @@ export interface SpotFormFields {
   carAccessibility?: string;
   spotId?: string;
   existingImages?: string[];
-  images?: File[];
+  imageUrls?: string[];
 }
 
 /**
@@ -37,12 +37,7 @@ export function buildSpotFormData(fields: SpotFormFields): FormData {
   if (fields.carAccessibility !== undefined) formData.set('carAccessibility', fields.carAccessibility);
   if (fields.spotId !== undefined) formData.set('spotId', fields.spotId);
   if (fields.existingImages !== undefined) formData.set('existingImages', JSON.stringify(fields.existingImages));
-
-  if (fields.images) {
-    fields.images.forEach((file, index) => {
-      formData.set(`image_${index}`, file);
-    });
-  }
+  if (fields.imageUrls !== undefined) formData.set('imageUrls', JSON.stringify(fields.imageUrls));
 
   return formData;
 }

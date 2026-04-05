@@ -23,12 +23,19 @@ Campaign Staff (Supporter)
   - `audienceAttributes` は定義順でソートされて保存される
 
 ### UC-CS-02: 画像付きでスポットを作成できる
-- **Given:** 正しいパスコードと必須項目に加え、画像ファイルが添付されている
-- **When:** スポットが投稿される
+- **Given:** 正しいパスコードと必須項目に加え、画像がR2にアップロード済みである
+- **When:** スポットが投稿される（画像URLリストを含む）
 - **Then:**
-  - 画像が R2 にアップロードされる
-  - アップロードされた画像の URL が `images` 配列に格納される
+  - `images` 配列にURL群が格納される
   - Spot が DB に保存される
+
+### UC-CS-04: Presigned URLを取得して画像をR2に直接アップロードできる
+- **Given:** 正しいパスコードとアップロード対象の画像メタデータ（ファイル名、MIMEタイプ）がある
+- **When:** Presigned URLが要求される
+- **Then:**
+  - サーバーがR2のPresigned URLを生成して返却する
+  - クライアントがPresigned URL経由でR2に画像を直接PUTする
+  - アップロード後のR2公開URLがクライアントに返却される
 
 ### UC-CS-03: 任意項目なしでスポットを作成できる
 - **Given:** 正しいパスコードと必須項目のみが入力されている（画像、説明、聴衆属性、時間帯は未入力）
@@ -53,3 +60,8 @@ Campaign Staff (Supporter)
 - **Given:** `rating` が 0 または 11 である
 - **When:** スポットが投稿される
 - **Then:** バリデーションエラーとなり、DB に変更はない
+
+### UC-CS-E04: パスコードが不正な場合はPresigned URLの取得が拒否される
+- **Given:** 不正なパスコードでPresigned URLが要求される
+- **When:** Presigned URL取得リクエストが送信される
+- **Then:** 操作は拒否され、Presigned URLは発行されない

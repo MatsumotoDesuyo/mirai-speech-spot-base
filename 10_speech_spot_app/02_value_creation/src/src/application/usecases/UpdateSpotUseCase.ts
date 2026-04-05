@@ -1,7 +1,8 @@
 import { Spot } from '@/domain/models/spot/Spot';
 import type { ISpotRepository } from '@/domain/repositories/ISpotRepository';
-import type { IImageStorage } from '@/domain/repositories/IImageStorage';
-import { AuthenticationError, ImageUploadError } from './CreateSpotUseCase';
+import { AuthenticationError, ImageLimitError } from './CreateSpotUseCase';
+
+const MAX_IMAGES = 10;
 
 export interface UpdateSpotCommand {
   passcode: string;
@@ -15,13 +16,12 @@ export interface UpdateSpotCommand {
   audienceAttributes: string[];
   carAccessibility: string;
   existingImages: string[];
-  newImages: { buffer: Buffer; fileName: string; mimeType: string }[];
+  newImageUrls: string[];
 }
 
 export class UpdateSpotUseCase {
   constructor(
     private readonly spotRepository: ISpotRepository,
-    private readonly imageStorage: IImageStorage,
     private readonly passcode: string,
   ) {}
 
@@ -35,21 +35,12 @@ export class UpdateSpotUseCase {
       throw new Error('スポットIDが指定されていません');
     }
 
-    // 新規画像アップロード
-    const newImageUrls: string[] = [];
-    for (let i = 0; i < command.newImages.length; i++) {
-      const img = command.newImages[i];
-      try {
-        const url = await this.imageStorage.upload(img.buffer, img.fileName, img.mimeType);
-        newImageUrls.push(url);
-      } catch (err) {
-        throw new ImageUploadError(
-          `画像${i + 1}のアップロードに失敗しました: ${err instanceof Error ? err.message : '不明なエラー'}`,
-        );
-      }
-    }
+    const allImages = [...command.existingImages, ...command.newImageUrls];
 
-    const allImages = [...command.existingImages, ...newImageUrls];
+    // R-SV-07: 画像枚数制限
+    if (allImages.length > MAX_IMAGES) {
+      throw new ImageLimitError(`画像は最大${MAX_IMAGES}枚までです`);
+    }
 
     // ドメインモデルでバリデーション + ソート適用
     const spot = Spot.forUpdate(command.spotId, {

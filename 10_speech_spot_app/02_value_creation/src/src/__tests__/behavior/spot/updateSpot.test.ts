@@ -19,14 +19,8 @@ import {
 } from '../../helpers/formDataHelper';
 
 // --- Mocks ---
-const mockUploadImage = vi.fn();
-
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => getMockCreateClient()(),
-}));
-
-vi.mock('@/lib/r2/client', () => ({
-  uploadImage: (...args: unknown[]) => mockUploadImage(...args),
 }));
 
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co');
@@ -116,16 +110,14 @@ describe('UpdateSpot', () => {
       expect(updateCall.lng).toBe(135.5023);
     });
 
-    it('UC-US-03: 既存画像を維持しつつ新規画像を追加できる', async () => {
-      mockUploadImage.mockResolvedValue('https://r2.example.com/spots/new-image.jpg');
+    it('UC-US-03: 既存画像を維持しつつ新規画像URLを追加できる', async () => {
       mockSupabaseResponse({ data: { id: 'existing-spot-id' } });
 
-      const newImage = new File(['new-image'], 'new.jpg', { type: 'image/jpeg' });
       const formData = buildSpotFormData({
         ...VALID_SPOT_DATA,
         spotId: 'existing-spot-id',
         existingImages: ['https://r2.example.com/spots/old-image.jpg'],
-        images: [newImage],
+        imageUrls: ['https://r2.example.com/spots/new-image.jpg'],
       });
       await updateSpot(formData);
 
@@ -208,20 +200,19 @@ describe('UpdateSpot', () => {
       expect(queryBuilder.update).not.toHaveBeenCalled();
     });
 
-    it('画像アップロードが失敗した場合はエラーが返される', async () => {
-      mockUploadImage.mockRejectedValue(new Error('R2 upload failed'));
-
-      const newImage = new File(['image'], 'photo.jpg', { type: 'image/jpeg' });
+    it('画像が合計10枚を超える場合は拒否される', async () => {
+      const existingImages = Array.from({ length: 6 }, (_, i) => `https://r2.example.com/spots/old${i}.jpg`);
+      const imageUrls = Array.from({ length: 5 }, (_, i) => `https://r2.example.com/spots/new${i}.jpg`);
       const formData = buildSpotFormData({
         ...VALID_SPOT_DATA,
         spotId: 'existing-spot-id',
-        existingImages: [],
-        images: [newImage],
+        existingImages,
+        imageUrls,
       });
       const result = await updateSpot(formData);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('画像');
+      expect(result.error).toContain('10');
       expect(queryBuilder.update).not.toHaveBeenCalled();
     });
 

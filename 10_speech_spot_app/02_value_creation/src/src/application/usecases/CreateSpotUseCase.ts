@@ -1,6 +1,7 @@
 import { Spot } from '@/domain/models/spot/Spot';
 import type { ISpotRepository } from '@/domain/repositories/ISpotRepository';
-import type { IImageStorage } from '@/domain/repositories/IImageStorage';
+
+const MAX_IMAGES = 10;
 
 export interface CreateSpotCommand {
   passcode: string;
@@ -12,13 +13,12 @@ export interface CreateSpotCommand {
   bestTime: number[];
   audienceAttributes: string[];
   carAccessibility: string;
-  images: { buffer: Buffer; fileName: string; mimeType: string }[];
+  imageUrls: string[];
 }
 
 export class CreateSpotUseCase {
   constructor(
     private readonly spotRepository: ISpotRepository,
-    private readonly imageStorage: IImageStorage,
     private readonly passcode: string,
   ) {}
 
@@ -28,18 +28,9 @@ export class CreateSpotUseCase {
       throw new AuthenticationError('パスコードが正しくありません');
     }
 
-    // 画像アップロード
-    const imageUrls: string[] = [];
-    for (let i = 0; i < command.images.length; i++) {
-      const img = command.images[i];
-      try {
-        const url = await this.imageStorage.upload(img.buffer, img.fileName, img.mimeType);
-        imageUrls.push(url);
-      } catch (err) {
-        throw new ImageUploadError(
-          `画像${i + 1}のアップロードに失敗しました: ${err instanceof Error ? err.message : '不明なエラー'}`,
-        );
-      }
+    // R-SV-07: 画像枚数制限
+    if (command.imageUrls.length > MAX_IMAGES) {
+      throw new ImageLimitError(`画像は最大${MAX_IMAGES}枚までです`);
     }
 
     // ドメインモデル生成（バリデーション + ソート）
@@ -52,7 +43,7 @@ export class CreateSpotUseCase {
       carAccessibility: command.carAccessibility,
       bestTime: command.bestTime,
       audienceAttributes: command.audienceAttributes,
-      imageUrls,
+      imageUrls: command.imageUrls,
     });
 
     return this.spotRepository.insert(spot);
@@ -63,6 +54,6 @@ export class AuthenticationError extends Error {
   readonly name = 'AuthenticationError';
 }
 
-export class ImageUploadError extends Error {
-  readonly name = 'ImageUploadError';
+export class ImageLimitError extends Error {
+  readonly name = 'ImageLimitError';
 }

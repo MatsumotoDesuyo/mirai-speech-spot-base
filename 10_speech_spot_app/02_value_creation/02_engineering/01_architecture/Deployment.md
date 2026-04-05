@@ -15,6 +15,21 @@
 - Public Development URL使用（カスタムドメイン不要）
 - 将来的にはCloudflare Workers経由またはカスタムドメインで対応可能
 
+### CORS設定
+クライアントからPresigned URL経由でR2に直接画像をアップロードするため、バケットにCORSポリシーの設定が必要。
+
+Cloudflare Dashboard → R2 → 対象バケット → Settings → CORS Policy に以下を設定:
+
+| 設定項目 | 値 |
+|:---|:---|
+| AllowedOrigins | `http://localhost:3000`, `https://<本番ドメイン>` |
+| AllowedMethods | `GET`, `PUT` |
+| AllowedHeaders | `Content-Type` |
+| MaxAgeSeconds | `3600` |
+
+- AllowedOriginsには全てのデプロイ先ドメインを追加すること
+- Preview Deploymentが必要な場合は `https://*-<project>.vercel.app` のワイルドカードも検討
+
 ## 環境変数一覧
 
 | 変数名 | スコープ | 説明 |
