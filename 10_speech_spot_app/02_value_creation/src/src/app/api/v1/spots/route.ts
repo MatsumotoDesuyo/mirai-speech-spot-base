@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createHash } from 'crypto';
-import type { Spot, GeoJsonFeatureCollection } from '@/types/spot';
+import {
+  GetSpotsApiUseCase,
+  InvalidApiKeyError,
+  ApiKeyDisabledError,
+  RateLimitExceededError,
+} from '@/application/usecases/GetSpotsApiUseCase';
+import { SupabaseApiKeyRepository } from '@/infrastructure/repositories/SupabaseApiKeyRepository';
+import { SupabaseApiAccessLogRepository } from '@/infrastructure/repositories/SupabaseApiAccessLogRepository';
+import { SupabaseSpotRepository } from '@/infrastructure/repositories/SupabaseSpotRepository';
+import type { GeoJsonFeatureCollection } from '@/types/spot';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const DAILY_RATE_LIMIT = 10;
-
-function hashApiKey(key: string): string {
-  return createHash('sha256').update(key).digest('hex');
-}
+const apiKeyRepository = new SupabaseApiKeyRepository(supabase);
+const accessLogRepository = new SupabaseApiAccessLogRepository(supabase);
+const spotRepository = new SupabaseSpotRepository(supabase);
 
 function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json(
@@ -25,121 +31,58 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 export async function GET(request: NextRequest) {
-  // 1. APIキー取得
-  const apiKey = request.headers.get('X-API-Key');
-  if (!apiKey) {
-    return errorResponse(401, 'INVALID_API_KEY', 'X-API-Key header is required.');
-  }
+  try {
+    const apiKey = request.headers.get('X-API-Key');
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
-  // 2. APIキー検証
-  const keyHash = hashApiKey(apiKey);
-  const { data: keyRecord, error: keyError } = await supabase
-    .from('api_keys')
-    .select('id, app_name, is_active')
-    .eq('api_key_hash', keyHash)
-    .single();
+    const useCase = new GetSpotsApiUseCase(apiKeyRepository, accessLogRepository, spotRepository);
+    const { spots } = await useCase.execute(apiKey, ip);
 
-  if (keyError || !keyRecord) {
-    return errorResponse(401, 'INVALID_API_KEY', 'Invalid API key.');
-  }
+    // GeoJSON レスポンス構築
+    const geojson: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      metadata: {
+        attribution: '演説スポットBase',
+        license: 'AGPL-3.0',
+        license_url: 'https://github.com/mirai-speech/mirai-speech-spot-base/blob/main/LICENSE',
+        generated_at: new Date().toISOString(),
+        total_count: spots.length,
+      },
+      features: spots.map((spot) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [spot.location.lng, spot.location.lat] as [number, number],
+        },
+        properties: {
+          id: spot.id,
+          title: spot.title,
+          description: spot.description,
+          rating: spot.rating.value,
+          best_time: spot.bestTime.toNullable(),
+          audience_attributes: spot.audienceAttributes.toNullable(),
+          car_accessibility: spot.carAccessibility.value,
+          images: [...spot.images],
+          created_at: spot.createdAt,
+          updated_at: spot.updatedAt,
+        },
+      })),
+    };
 
-  if (!keyRecord.is_active) {
-    return errorResponse(403, 'API_KEY_DISABLED', 'This API key has been disabled.');
-  }
-
-  // 3. レート制限チェック（UTC日次）
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-
-  const { count, error: countError } = await supabase
-    .from('api_access_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('api_key_id', keyRecord.id)
-    .gte('accessed_at', todayStart.toISOString())
-    .eq('response_status', 200);
-
-  if (countError) {
-    console.error('Rate limit check error:', countError);
+    return NextResponse.json(geojson, {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (err) {
+    if (err instanceof InvalidApiKeyError) {
+      return errorResponse(401, 'INVALID_API_KEY', err.message);
+    }
+    if (err instanceof ApiKeyDisabledError) {
+      return errorResponse(403, 'API_KEY_DISABLED', err.message);
+    }
+    if (err instanceof RateLimitExceededError) {
+      return errorResponse(429, 'RATE_LIMIT_EXCEEDED', err.message);
+    }
     return errorResponse(500, 'INTERNAL_ERROR', 'An internal error occurred.');
   }
-
-  const todayCount = count ?? 0;
-  if (todayCount >= DAILY_RATE_LIMIT) {
-    // レート制限超過もログに記録
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-    await supabase.from('api_access_logs').insert({
-      api_key_id: keyRecord.id,
-      response_status: 429,
-      ip_address: ip,
-    });
-
-    return errorResponse(
-      429,
-      'RATE_LIMIT_EXCEEDED',
-      `Daily API limit (${DAILY_RATE_LIMIT} requests) exceeded. Try again tomorrow.`
-    );
-  }
-
-  // 4. スポットデータ取得
-  const { data: spots, error: spotsError } = await supabase
-    .from('spots')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (spotsError) {
-    console.error('Spots fetch error:', spotsError);
-    // エラーもログに記録
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-    await supabase.from('api_access_logs').insert({
-      api_key_id: keyRecord.id,
-      response_status: 500,
-      ip_address: ip,
-    });
-    return errorResponse(500, 'INTERNAL_ERROR', 'Failed to fetch spots data.');
-  }
-
-  // 5. アクセスログ記録（成功）
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-  await supabase.from('api_access_logs').insert({
-    api_key_id: keyRecord.id,
-    response_status: 200,
-    ip_address: ip,
-  });
-
-  // 6. GeoJSON レスポンス構築
-  const typedSpots = spots as Spot[];
-  const geojson: GeoJsonFeatureCollection = {
-    type: 'FeatureCollection',
-    metadata: {
-      attribution: '演説スポットBase',
-      license: 'AGPL-3.0',
-      license_url: 'https://github.com/mirai-speech/mirai-speech-spot-base/blob/main/LICENSE',
-      generated_at: new Date().toISOString(),
-      total_count: typedSpots.length,
-    },
-    features: typedSpots.map((spot) => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [spot.lng, spot.lat] as [number, number],
-      },
-      properties: {
-        id: spot.id,
-        title: spot.title,
-        description: spot.description,
-        rating: spot.rating,
-        best_time: spot.best_time,
-        audience_attributes: spot.audience_attributes,
-        car_accessibility: spot.car_accessibility,
-        images: spot.images,
-        created_at: spot.created_at,
-        updated_at: spot.updated_at,
-      },
-    })),
-  };
-
-  return NextResponse.json(geojson, {
-    status: 200,
-    headers: { 'Cache-Control': 'no-store' },
-  });
 }

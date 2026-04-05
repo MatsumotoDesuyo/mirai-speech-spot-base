@@ -1,0 +1,10 @@
+export { Rating } from './spot/Rating';
+export { Location } from './spot/Location';
+export { CarAccessibility } from './spot/CarAccessibility';
+export type { CarAccessibilityValue } from './spot/CarAccessibility';
+export { BestTime } from './spot/BestTime';
+export { AudienceAttributes } from './spot/AudienceAttributes';
+export type { AudienceAttributeValue } from './spot/AudienceAttributes';
+export { Spot } from './spot/Spot';
+export type { CreateSpotInput, UpdateSpotInput } from './spot/Spot';
+export { ApiKeyValue } from './api-key/ApiKeyValue';

@@ -1,7 +1,11 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { uploadImage } from '@/lib/r2/client';
+import { CreateSpotUseCase, AuthenticationError, ImageUploadError } from '@/application/usecases/CreateSpotUseCase';
+import { UpdateSpotUseCase } from '@/application/usecases/UpdateSpotUseCase';
+import { DeleteSpotUseCase, AdminAuthenticationError } from '@/application/usecases/DeleteSpotUseCase';
+import { SupabaseSpotRepository } from '@/infrastructure/repositories/SupabaseSpotRepository';
+import { R2ImageStorage } from '@/infrastructure/storage/R2ImageStorage';
 import { ApiResponse } from '@/types/spot';
 
 // サーバーサイド用のSupabaseクライアント
@@ -10,35 +14,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const PASSCODE = process.env.PASSCODE;
-
-// 聴衆属性の正規順序（constants.tsと同じ）
-const AUDIENCE_ATTRIBUTES_ORDER = ['主婦', '学生', '社会人', '高齢者', 'ファミリー'];
-
-// 聴衆属性をソート
-function sortAudienceAttributes(attrs: string[]): string[] {
-  return [...attrs].sort((a, b) => {
-    const indexA = AUDIENCE_ATTRIBUTES_ORDER.indexOf(a);
-    const indexB = AUDIENCE_ATTRIBUTES_ORDER.indexOf(b);
-    // 定義順に並べる（未知の属性は末尾）
-    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-  });
-}
-
-// 時間帯をソート（数値昇順）
-function sortBestTime(times: number[]): number[] {
-  return [...times].sort((a, b) => a - b);
-}
+const spotRepository = new SupabaseSpotRepository(supabase);
+const imageStorage = new R2ImageStorage();
 
 export async function createSpot(formData: FormData): Promise<ApiResponse<{ id: string }>> {
   try {
-    // パスコード検証
     const passcode = formData.get('passcode') as string;
-    if (passcode !== PASSCODE) {
-      return { success: false, error: 'パスコードが正しくありません' };
-    }
-
-    // フォームデータを取得
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const rating = parseInt(formData.get('rating') as string, 10);
@@ -48,68 +29,31 @@ export async function createSpot(formData: FormData): Promise<ApiResponse<{ id: 
     const audienceAttributes = JSON.parse(formData.get('audienceAttributes') as string) as string[];
     const carAccessibility = formData.get('carAccessibility') as string;
 
-    // バリデーション
-    if (!title || !rating || !lat || !lng) {
-      return { success: false, error: '必須項目が入力されていません' };
-    }
-
-    if (!carAccessibility || !['allowed', 'brief_stop', 'not_allowed'].includes(carAccessibility)) {
-      return { success: false, error: '選挙カー利用可否を選択してください' };
-    }
-
-    // 画像をアップロード
-    const imageUrls: string[] = [];
+    // 画像ファイルを収集
+    const images: { buffer: Buffer; fileName: string; mimeType: string }[] = [];
     let imageIndex = 0;
-    
     while (true) {
       const imageFile = formData.get(`image_${imageIndex}`) as File | null;
       if (!imageFile) break;
-
-      console.log(`Processing image ${imageIndex}: ${imageFile.name}, size: ${imageFile.size} bytes`);
-      
-      try {
-        const buffer = Buffer.from(await imageFile.arrayBuffer());
-        const fileName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const url = await uploadImage(buffer, fileName, imageFile.type);
-        imageUrls.push(url);
-        console.log(`Image ${imageIndex} uploaded successfully`);
-      } catch (uploadErr) {
-        console.error(`Image upload error for image ${imageIndex}:`, uploadErr);
-        return { success: false, error: `画像${imageIndex + 1}のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
-      }
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      images.push({ buffer, fileName: imageFile.name, mimeType: imageFile.type });
       imageIndex++;
     }
 
-    console.log(`Total images uploaded: ${imageUrls.length}`);
+    const useCase = new CreateSpotUseCase(spotRepository, imageStorage, process.env.PASSCODE!);
+    const result = await useCase.execute({
+      passcode, title, description, rating, lat, lng,
+      bestTime, audienceAttributes, carAccessibility, images,
+    });
 
-    // データベースに保存
-    const sortedBestTime = sortBestTime(bestTime);
-    const sortedAudienceAttributes = sortAudienceAttributes(audienceAttributes);
-    
-    const { data, error } = await supabase
-      .from('spots')
-      .insert({
-        title,
-        description: description || null,
-        rating,
-        lat,
-        lng,
-        best_time: sortedBestTime.length > 0 ? sortedBestTime : null,
-        audience_attributes: sortedAudienceAttributes.length > 0 ? sortedAudienceAttributes : null,
-        car_accessibility: carAccessibility,
-        images: imageUrls,
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return { success: false, error: 'データベースへの保存に失敗しました' };
-    }
-
-    return { success: true, data: { id: data.id } };
+    return { success: true, data: result };
   } catch (err) {
-    console.error('Create spot error:', err);
+    if (err instanceof AuthenticationError || err instanceof ImageUploadError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof Error) {
+      return { success: false, error: err.message };
+    }
     return { success: false, error: '予期せぬエラーが発生しました' };
   }
 }
@@ -119,42 +63,24 @@ export async function deleteSpot(
   adminPassword: string
 ): Promise<ApiResponse> {
   try {
-    // 管理者パスワード検証
-    if (adminPassword !== process.env.ADMIN_PASSWORD) {
-      return { success: false, error: '管理者パスワードが正しくありません' };
-    }
-
-    const { error } = await supabase
-      .from('spots')
-      .delete()
-      .eq('id', spotId);
-
-    if (error) {
-      console.error('Delete error:', error);
-      return { success: false, error: '削除に失敗しました' };
-    }
-
+    const useCase = new DeleteSpotUseCase(spotRepository, process.env.ADMIN_PASSWORD!);
+    await useCase.execute(spotId, adminPassword);
     return { success: true };
   } catch (err) {
-    console.error('Delete spot error:', err);
+    if (err instanceof AdminAuthenticationError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof Error) {
+      return { success: false, error: err.message };
+    }
     return { success: false, error: '予期せぬエラーが発生しました' };
   }
 }
 
 export async function updateSpot(formData: FormData): Promise<ApiResponse<{ id: string }>> {
   try {
-    // パスコード検証
     const passcode = formData.get('passcode') as string;
-    if (passcode !== PASSCODE) {
-      return { success: false, error: 'パスコードが正しくありません' };
-    }
-
     const spotId = formData.get('spotId') as string;
-    if (!spotId) {
-      return { success: false, error: 'スポットIDが指定されていません' };
-    }
-
-    // フォームデータを取得
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const rating = parseInt(formData.get('rating') as string, 10);
@@ -165,73 +91,31 @@ export async function updateSpot(formData: FormData): Promise<ApiResponse<{ id: 
     const carAccessibility = formData.get('carAccessibility') as string;
     const existingImages = JSON.parse(formData.get('existingImages') as string || '[]') as string[];
 
-    // バリデーション
-    if (!title || !rating || !lat || !lng) {
-      return { success: false, error: '必須項目が入力されていません' };
-    }
-
-    if (!carAccessibility || !['allowed', 'brief_stop', 'not_allowed'].includes(carAccessibility)) {
-      return { success: false, error: '選挙カー利用可否を選択してください' };
-    }
-
-    // 新しい画像をアップロード
-    const newImageUrls: string[] = [];
+    // 新規画像ファイルを収集
+    const newImages: { buffer: Buffer; fileName: string; mimeType: string }[] = [];
     let imageIndex = 0;
-    
     while (true) {
       const imageFile = formData.get(`image_${imageIndex}`) as File | null;
       if (!imageFile) break;
-
-      console.log(`Processing new image ${imageIndex}: ${imageFile.name}, size: ${imageFile.size} bytes`);
-
-      try {
-        const buffer = Buffer.from(await imageFile.arrayBuffer());
-        const fileName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const url = await uploadImage(buffer, fileName, imageFile.type);
-        newImageUrls.push(url);
-        console.log(`New image ${imageIndex} uploaded successfully`);
-      } catch (uploadErr) {
-        console.error(`Image upload error for new image ${imageIndex}:`, uploadErr);
-        return { success: false, error: `画像${imageIndex + 1}のアップロードに失敗しました: ${uploadErr instanceof Error ? uploadErr.message : '不明なエラー'}` };
-      }
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      newImages.push({ buffer, fileName: imageFile.name, mimeType: imageFile.type });
       imageIndex++;
     }
 
-    console.log(`Existing images: ${existingImages.length}, New images: ${newImageUrls.length}`);
+    const useCase = new UpdateSpotUseCase(spotRepository, imageStorage, process.env.PASSCODE!);
+    const result = await useCase.execute({
+      passcode, spotId, title, description, rating, lat, lng,
+      bestTime, audienceAttributes, carAccessibility, existingImages, newImages,
+    });
 
-    // 既存画像 + 新規画像
-    const allImages = [...existingImages, ...newImageUrls];
-
-    // データベースを更新
-    const sortedBestTime = sortBestTime(bestTime);
-    const sortedAudienceAttributes = sortAudienceAttributes(audienceAttributes);
-    
-    const { data, error } = await supabase
-      .from('spots')
-      .update({
-        title,
-        description: description || null,
-        rating,
-        lat,
-        lng,
-        best_time: sortedBestTime.length > 0 ? sortedBestTime : null,
-        audience_attributes: sortedAudienceAttributes.length > 0 ? sortedAudienceAttributes : null,
-        car_accessibility: carAccessibility,
-        images: allImages,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', spotId)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return { success: false, error: 'データベースの更新に失敗しました' };
-    }
-
-    return { success: true, data: { id: data.id } };
+    return { success: true, data: result };
   } catch (err) {
-    console.error('Update spot error:', err);
+    if (err instanceof AuthenticationError || err instanceof ImageUploadError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof Error) {
+      return { success: false, error: err.message };
+    }
     return { success: false, error: '予期せぬエラーが発生しました' };
   }
 }
