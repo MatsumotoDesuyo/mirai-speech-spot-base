@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '10_speech_spot_app/02_value_creation/src/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '10_speech_spot_app/02_value_creation/src/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Type Check, Test & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 10_speech_spot_app/02_value_creation/src
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: 10_speech_spot_app/02_value_creation/src/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm tsc --noEmit
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: dummy
+          NEXT_PUBLIC_DEFAULT_CENTER_LNG: '139.7671'
+          NEXT_PUBLIC_DEFAULT_CENTER_LAT: '35.6812'
+          NEXT_PUBLIC_DEFAULT_ZOOM: '13'
+          NEXT_PUBLIC_R2_PUBLIC_URL: http://localhost
+          R2_ACCOUNT_ID: dummy
+          R2_ACCESS_KEY_ID: dummy
+          R2_SECRET_ACCESS_KEY: dummy
+          R2_BUCKET_NAME: dummy
+          PASSCODE: dummy
+          ADMIN_PASSWORD: dummy
+          API_ADMIN_PASSCODE: dummy-passcode-for-ci-build-32chars
