@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ApiKeyValue } from '@/domain/models/api-key/ApiKeyValue';
 
 describe('ApiKeyValue Value Object', () => {
